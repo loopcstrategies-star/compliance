@@ -1,6 +1,6 @@
 # Architecture
 
-Phase 1 design. Nothing in this document is implemented. No production region is selected.
+Phase 1 design. Later phases implement the modules described here. No production region is selected.
 
 ## System
 
@@ -15,7 +15,7 @@ One deployable application. One shared backend. One multi-tenant database. Four 
 
 Adding a tenant is a data row and configuration. It does not copy the codebase.
 
-Stack decision for later phases: a TypeScript monorepo, a NestJS API that owns business rules, a Next.js app for the four interfaces, PostgreSQL, and Prisma migrations. Object storage sits behind an interface. The provider and region stay unselected until the Phase 7 cost and residency comparison is approved. PDF generation will overlay answers on the immutable source bytes with a library such as `pdf-lib`. It will not redraw the templates.
+The repository uses that stack: a TypeScript monorepo, a NestJS API that owns business rules, a Next.js app for the four interfaces, PostgreSQL, and Prisma migrations. Object storage sits behind an interface. The provider and region stay unselected. The Phase 7 comparison records prices and leaves the selection empty. PDF generation overlays the immutable source bytes with `pdf-lib`. It does not redraw the templates.
 
 ## Backend modules
 
@@ -82,13 +82,13 @@ A user cannot approve their own maker work. Maker, checker, and authorised appro
 
 ## Jobs and retention
 
-Jobs are designed here and built later: invitation follow-up, incomplete draft, missing document, correction request, review SLA, expiry reminder, escalation. Each job has an idempotency key, a retry policy, a delivery record, and a duplicate-notification check.
+The job list is the design: invitation follow-up, incomplete draft, missing document, correction request, review SLA, expiry reminder, escalation. Each designed job has an idempotency key, a retry policy, a delivery record, and a duplicate-notification check. Phase 6 records `draft_idle`, `correction`, `review_overdue`, `review_escalation`, and `document_expiry` with an idempotency key. A live mail provider is outside this design. Invitation follow-up and missing-document jobs are still design items.
 
 Retention policies have an effective date, a record category, and a legal-hold flag. Deletion requires an approval. The first step is soft-delete or quarantine. Irreversible deletion refuses rows under a legal hold. Backup and replica expiry has to follow the same policy once a provider is chosen. No provider is chosen in this phase.
 
 ## What is explicitly not decided
 
-- Cloud provider, region, and monthly cost. Phase 7 writes that comparison from current prices before any production region is selected.
-- Staging and production accounts, CI, and backup tooling. They wait on the same decision.
+- Cloud provider, region, and monthly cost. Phase 7 records a price comparison. The selected provider and region stay empty.
+- Staging and production accounts, and CI, stay undecided. Local backup tooling is Phase 8. It is not a production restore.
 - Answer-rectangle coordinates still marked `unresolved` in the placement spec.
-- No existing business data is in this workspace, so there is nothing to migrate. If data appears before Phase 2, it is not deleted or reset without a reviewed migration plan and a verified backup.
+- Business data is not deleted or reset without a reviewed migration plan and a verified backup.

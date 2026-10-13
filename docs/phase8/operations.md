@@ -24,4 +24,4 @@ Set `BACKUP_ENCRYPTION_KEY` to 32 bytes of base64 in the shell, not in git. From
 node scripts/backup-restore.mjs
 ```
 
-The script dumps `myka`, encrypts the dump with AES-256-GCM, restores it into `myka_restore_check`, checks that the tenant count matches, and drops the temporary database. To recover the live database, decrypt a saved copy of that dump with the same key and restore it with `psql` only after the current data has been copied aside. Do not run that restore against the live database as a drill.
+The script refuses to run unless the local PostgreSQL port is 54329. It creates synthetic rows in `myka_backup_drill`, writes one synthetic file in a temporary directory, encrypts that dump with AES-256-GCM, restores it into `myka_restore_check`, checks the tenant, the document-to-file link, the audit row, and the file checksum, then drops only those two drill databases. It does not dump or drop `myka`. To recover the live database, take a separate dump and restore it with `psql` only after the current data has been copied aside. Do not run that restore against the live database as a drill.
