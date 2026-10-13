@@ -1,6 +1,6 @@
 # Operations
 
-The selected host and region stay empty. See [the cloud comparison](../phase7/cloud-comparison.md). This note describes the local application and how to recover it. It does not deploy production.
+The selected host and region stay empty. See [the cloud comparison](../phase7/cloud-comparison.md). Windows development is in [local-windows.md](local-windows.md). A machine you operate is in [self-hosted.md](self-hosted.md). This note does not deploy to Vercel or Railway.
 
 ## Run
 
