@@ -6,12 +6,14 @@ dotenv.config({ path: new URL('../../../.env', import.meta.url) });
 
 const MAKER_EMAIL = 'maker-phase5@example.com';
 const ADMIN_EMAIL = 'admin-phase5@example.com';
+const CUSTOMER_EMAIL = 'customer-phase5@example.com';
 
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
 
 const maker = await prisma.user.findUnique({ where: { email: MAKER_EMAIL }, select: { id: true } });
 const admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL }, select: { id: true } });
-if (maker && admin) {
+const customerUser = await prisma.user.findUnique({ where: { email: CUSTOMER_EMAIL }, select: { id: true } });
+if (maker && admin && customerUser) {
   console.log('Development accounts already exist.');
   await prisma.$disconnect();
   process.exit(0);
@@ -35,7 +37,8 @@ if (!system) {
 }
 const makerRole = await prisma.role.findUnique({ where: { key: 'maker' } });
 const adminRole = await prisma.role.findUnique({ where: { key: 'super_admin' } });
-if (!makerRole || !adminRole) {
+const customerRole = await prisma.role.findUnique({ where: { key: 'customer' } });
+if (!makerRole || !adminRole || !customerRole) {
   console.error('Role catalogue is missing.');
   await prisma.$disconnect();
   process.exit(1);
@@ -62,6 +65,28 @@ if (!admin) {
     },
   });
   await prisma.userRole.create({ data: { tenantId: system.id, userId: user.id, roleId: adminRole.id } });
+}
+if (!customerUser) {
+  const user = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      email: CUSTOMER_EMAIL,
+      displayName: 'Phase 5 Customer',
+      passwordHash,
+    },
+  });
+  await prisma.userRole.create({ data: { tenantId: tenant.id, userId: user.id, roleId: customerRole.id } });
+  const party = await prisma.customer.create({
+    data: {
+      tenantId: tenant.id,
+      userId: user.id,
+      legalName: 'Phase 5 Customer',
+      customerType: 'local_company',
+    },
+  });
+  await prisma.application.create({
+    data: { tenantId: tenant.id, customerId: party.id, schemaVersion: 1, status: 'draft' },
+  });
 }
 
 console.log('Missing development accounts were created.');
