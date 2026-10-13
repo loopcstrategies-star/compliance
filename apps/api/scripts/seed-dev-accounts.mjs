@@ -27,9 +27,10 @@ if (!password) {
 }
 
 const passwordHash = await hash(password, { type: argon2id });
-let tenant = await prisma.tenant.findFirst({ where: { isSystem: false }, orderBy: { createdAt: 'asc' } });
+const localTenantName = 'Local development';
+let tenant = await prisma.tenant.findFirst({ where: { name: localTenantName, isSystem: false } });
 if (!tenant) {
-  tenant = await prisma.tenant.create({ data: { name: 'Tenant A' } });
+  tenant = await prisma.tenant.create({ data: { name: localTenantName } });
 }
 let system = await prisma.tenant.findFirst({ where: { isSystem: true }, orderBy: { createdAt: 'asc' } });
 if (!system) {

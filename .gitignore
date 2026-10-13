@@ -7,3 +7,5 @@ coverage
 .prisma
 storage
 storage-test
+backups/
+*.dump.enc

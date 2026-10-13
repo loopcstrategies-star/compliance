@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` in the repository root. Set these names on that ma
 - `API_INTERNAL_URL` as `http://localhost:3001`
 - `FILE_STORAGE_DIR` for a private folder, or leave it empty to use `apps/api/storage`
 - `SEED_DEMO_PASSWORD` only when creating local development accounts
-- `BACKUP_ENCRYPTION_KEY` in the shell when running the backup drill, not in git
+- `BACKUP_ENCRYPTION_KEY` as 32 random bytes of base64, in `.env` or the Windows user environment, not in git
 
 `FILE_STORAGE_DIR` and `apps/api/storage` are outside git. Files written there remain after the API process stops.
 
@@ -54,6 +54,18 @@ docker compose stop
 ```
 
 `docker compose stop` keeps the database volume. Do not remove the volume if you need the existing rows.
+
+## Backup
+
+From `apps/api`, with PostgreSQL published on port 54329:
+
+```
+node scripts/backup-local.mjs
+node scripts/restore-isolated.mjs <path-to-myka.dump.enc>
+node scripts/backup-filecheck.mjs
+```
+
+`backup-local.mjs` copies only `myka` and the private file directory. `restore-isolated.mjs` restores only into an empty `myka_accept_restore`. `backup-filecheck.mjs` uses `myka_filecheck_source` and `myka_filecheck_restore` for a synthetic file. None of these commands drop or overwrite `myka`. Keep `*.dump.enc` files outside git.
 
 ## Tests
 
