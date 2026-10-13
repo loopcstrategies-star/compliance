@@ -1,0 +1,89 @@
+:root {
+  color: #1c1917;
+  background: #f6f3ee;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #a8a29e;
+  border-radius: 0.25rem;
+  background: #fff;
+}
+
+textarea {
+  min-height: 4.5rem;
+}
+
+fieldset {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+}
+
+.row {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+h2,
+h3 {
+  font-size: 1.15rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: #7c2d12;
+  color: #fff;
+  width: fit-content;
+}
+
+.notice {
+  padding: 0.75rem 0.9rem;
+  background: #fff;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.25rem;
+}
+
+a {
+  color: #7c2d12;
+}

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: myka
+      MYKA_MIGRATOR_PASSWORD: ${MYKA_MIGRATOR_PASSWORD}
+      MYKA_APP_PASSWORD: ${MYKA_APP_PASSWORD}
+    ports:
+      - "54329:5432"
+    volumes:
+      - myka_pg:/var/lib/postgresql/data
+      - ./docker/init-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myka"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  myka_pg:

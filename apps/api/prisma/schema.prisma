@@ -1,0 +1,491 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at")
+  users        User[]
+  customers    Customer[]
+  invitations  Invitation[]
+  applications Application[]
+  checklistCategories ChecklistCategory[]
+  storedFiles StoredFile[]
+  documents Document[]
+  signatureEvidence SignatureEvidence[]
+  letterhead Letterhead?
+  generatedPackages GeneratedPackage[]
+  segregationPolicy SegregationPolicy?
+  submissions Submission[]
+  reviewDecisions ReviewDecision[]
+  operationsPolicy OperationsPolicy?
+  deliveries Delivery[]
+  applicability TenantApplicability[]
+  retentionPolicies RetentionPolicy[]
+  legalHolds LegalHold[]
+  deletionRequests DeletionRequest[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  mfaSecret    String?    @map("mfa_secret")
+  mfaEnrolledAt DateTime? @map("mfa_enrolled_at")
+  displayName  String     @map("display_name")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  roles        UserRole[]
+  sessions     Session[]
+  customer     Customer?
+  reviewDecisions ReviewDecision[]
+  assignedApplications Application[] @relation("ApplicationAssignee")
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  mfaSatisfied Boolean   @default(false) @map("mfa_satisfied")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@map("sessions")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id    String           @id @default(uuid()) @db.Uuid
+  key   String           @unique
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  roleId   String @map("role_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id])
+  role     Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id") @db.Uuid
+  purpose    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("audit_events")
+}
+
+model Customer {
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @map("tenant_id") @db.Uuid
+  userId       String?       @unique @map("user_id") @db.Uuid
+  legalName    String        @map("legal_name")
+  customerType String        @map("customer_type")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  applications Application[]
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model Invitation {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  email        String
+  legalName    String    @map("legal_name")
+  customerType String    @map("customer_type")
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  usedAt       DateTime? @map("used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("invitations")
+}
+
+model FormSchema {
+  id         String      @id @default(uuid()) @db.Uuid
+  templateId String      @map("template_id")
+  version    Int
+  fields     FormField[]
+
+  @@unique([templateId, version])
+  @@map("form_schemas")
+}
+
+model FormField {
+  id         String     @id @default(uuid()) @db.Uuid
+  schemaId   String     @map("schema_id") @db.Uuid
+  fieldKey   String     @map("field_key")
+  label      String
+  widget     String
+  repeatable Boolean    @default(false)
+  options    Json?
+  columns    Json?
+  sortOrder  Int        @map("sort_order")
+  schema     FormSchema @relation(fields: [schemaId], references: [id])
+
+  @@unique([schemaId, fieldKey])
+  @@map("form_fields")
+}
+
+model ApplicabilityRule {
+  id           String  @id @default(uuid()) @db.Uuid
+  customerType String  @map("customer_type")
+  templateId   String  @map("template_id")
+  fieldKey     String  @default("") @map("field_key")
+  required     Boolean @default(true)
+
+  @@unique([customerType, templateId, fieldKey])
+  @@map("applicability_rules")
+}
+
+model TenantApplicability {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  customerType String  @map("customer_type")
+  templateId   String  @map("template_id")
+  required     Boolean
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, customerType, templateId])
+  @@index([tenantId])
+  @@map("tenant_applicability")
+}
+
+model RetentionPolicy {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  category      String
+  retentionDays Int      @map("retention_days")
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, category])
+  @@index([tenantId])
+  @@map("retention_policies")
+}
+
+model LegalHold {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  targetType String    @map("target_type")
+  targetId   String    @map("target_id") @db.Uuid
+  reason     String
+  releasedAt DateTime? @map("released_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("legal_holds")
+}
+
+model DeletionRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  targetType  String    @map("target_type")
+  targetId    String    @map("target_id") @db.Uuid
+  requesterId String    @map("requester_id") @db.Uuid
+  approverId  String?   @map("approver_id") @db.Uuid
+  status      String
+  reason      String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("deletion_requests")
+}
+
+model ChecklistCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("checklist_categories")
+}
+
+model Application {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  customerId    String   @map("customer_id") @db.Uuid
+  schemaVersion Int      @default(1) @map("schema_version")
+  status        String   @default("draft")
+  documentVersion Int    @default(1) @map("document_version")
+  assigneeId    String?  @map("assignee_id") @db.Uuid
+  statusChangedAt DateTime @default(now()) @map("status_changed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  customer      Customer @relation(fields: [customerId], references: [id])
+  assignee      User?    @relation("ApplicationAssignee", fields: [assigneeId], references: [id])
+  answers       Answer[]
+  documents     Document[]
+  signatureEvidence SignatureEvidence[]
+  generatedPackages GeneratedPackage[]
+  submissions   Submission[]
+  deliveries    Delivery[]
+
+  @@index([tenantId])
+  @@map("applications")
+}
+
+model Answer {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @map("tenant_id") @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  fieldKey      String      @map("field_key")
+  value         Json
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  @@unique([applicationId, fieldKey])
+  @@index([tenantId])
+  @@map("answers")
+}
+
+model TemplateVersion {
+  id              String      @id @default(uuid()) @db.Uuid
+  templateId      String      @map("template_id")
+  version         Int
+  pageCount       Int         @map("page_count")
+  sha256          String
+  letterheadOwner String      @map("letterhead_owner")
+  sourceFile      String      @map("source_file")
+  placements      Placement[]
+
+  @@unique([templateId, version])
+  @@map("template_versions")
+}
+
+model Placement {
+  id                String          @id @default(uuid()) @db.Uuid
+  templateVersionId String          @map("template_version_id") @db.Uuid
+  fieldKey          String          @map("field_key")
+  status            String
+  rect              Json?
+  templateVersion   TemplateVersion @relation(fields: [templateVersionId], references: [id])
+
+  @@unique([templateVersionId, fieldKey])
+  @@map("placements")
+}
+
+model StoredFile {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @map("tenant_id") @db.Uuid
+  storageKey   String              @unique @map("storage_key")
+  mediaType    String              @map("media_type")
+  byteSize     Int                 @map("byte_size")
+  sha256       String
+  scanStatus   String              @map("scan_status")
+  quarantinedAt DateTime?          @map("quarantined_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
+  documents    Document[]
+  signatures   SignatureEvidence[]
+  letterhead   Letterhead?
+  packages     GeneratedPackage[]
+
+  @@index([tenantId])
+  @@map("stored_files")
+}
+
+model Document {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @map("tenant_id") @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  fieldKey      String      @map("field_key")
+  fileId        String      @map("file_id") @db.Uuid
+  expiresOn     DateTime?   @map("expires_on") @db.Date
+  createdAt     DateTime    @default(now()) @map("created_at")
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id])
+  file          StoredFile  @relation(fields: [fileId], references: [id])
+
+  @@unique([applicationId, fieldKey])
+  @@index([tenantId])
+  @@map("documents")
+}
+
+model SignatureEvidence {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @map("tenant_id") @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  templateId    String      @map("template_id")
+  method        String
+  authorisedAt  DateTime    @map("authorised_at")
+  consentText   String      @map("consent_text")
+  statement     String
+  fileId        String      @map("file_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at")
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id])
+  file          StoredFile  @relation(fields: [fileId], references: [id])
+
+  @@index([tenantId])
+  @@map("signature_evidence")
+}
+
+model Letterhead {
+  id        String     @id @default(uuid()) @db.Uuid
+  tenantId  String     @unique @map("tenant_id") @db.Uuid
+  fileId    String     @unique @map("file_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  file      StoredFile @relation(fields: [fileId], references: [id])
+
+  @@map("letterheads")
+}
+
+model GeneratedPackage {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  applicationId  String      @map("application_id") @db.Uuid
+  templateId     String      @map("template_id")
+  templateSha256 String      @map("template_sha256")
+  version        Int
+  fileId         String      @map("file_id") @db.Uuid
+  painted        Json
+  blocked        Json
+  createdAt      DateTime    @default(now()) @map("created_at")
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  application    Application @relation(fields: [applicationId], references: [id])
+  file           StoredFile  @relation(fields: [fileId], references: [id])
+
+  @@unique([applicationId, templateId, version])
+  @@index([tenantId])
+  @@map("generated_packages")
+}
+
+model SegregationPolicy {
+  id                          String   @id @default(uuid()) @db.Uuid
+  tenantId                    String   @unique @map("tenant_id") @db.Uuid
+  makerDistinctFromChecker    Boolean  @default(true) @map("maker_distinct_from_checker")
+  checkerDistinctFromApprover Boolean  @default(true) @map("checker_distinct_from_approver")
+  makerDistinctFromApprover   Boolean  @default(true) @map("maker_distinct_from_approver")
+  tenant                      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("segregation_policies")
+}
+
+model Submission {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  applicationId   String           @map("application_id") @db.Uuid
+  documentVersion Int              @map("document_version")
+  packageIds      Json             @map("package_ids")
+  supersededAt    DateTime?        @map("superseded_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  application     Application      @relation(fields: [applicationId], references: [id])
+  decisions       ReviewDecision[]
+
+  @@index([tenantId])
+  @@index([applicationId])
+  @@map("submissions")
+}
+
+model ReviewDecision {
+  id              String     @id @default(uuid()) @db.Uuid
+  tenantId        String     @map("tenant_id") @db.Uuid
+  submissionId    String     @map("submission_id") @db.Uuid
+  stage           String
+  outcome         String
+  actorId         String     @map("actor_id") @db.Uuid
+  reason          String
+  evidenceIds     Json       @map("evidence_ids")
+  documentVersion Int        @map("document_version")
+  supersededAt    DateTime?  @map("superseded_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  tenant          Tenant     @relation(fields: [tenantId], references: [id])
+  submission      Submission @relation(fields: [submissionId], references: [id])
+  actor           User       @relation(fields: [actorId], references: [id])
+
+  @@index([tenantId])
+  @@index([submissionId])
+  @@map("review_decisions")
+}
+
+model OperationsPolicy {
+  id                 String  @id @default(uuid()) @db.Uuid
+  tenantId           String  @unique @map("tenant_id") @db.Uuid
+  makerHours         Int     @default(48) @map("maker_hours")
+  checkerHours       Int     @default(48) @map("checker_hours")
+  approverHours      Int     @default(48) @map("approver_hours")
+  draftReminderDays  Int     @default(7) @map("draft_reminder_days")
+  expiryLeadDays     Int     @default(30) @map("expiry_lead_days")
+  escalationEmail    String  @default("") @map("escalation_email")
+  tenant             Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@map("operations_policies")
+}
+
+model Delivery {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  applicationId  String      @map("application_id") @db.Uuid
+  kind           String
+  idempotencyKey String      @unique @map("idempotency_key")
+  recipient      String
+  status         String
+  createdAt      DateTime    @default(now()) @map("created_at")
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  application    Application @relation(fields: [applicationId], references: [id])
+
+  @@index([tenantId])
+  @@index([applicationId])
+  @@map("deliveries")
+}
