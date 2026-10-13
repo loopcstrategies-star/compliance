@@ -6,12 +6,12 @@ The four source PDFs stay in `docs/templates/source`. Unresolved answer rectangl
 
 ## Local use
 
-Start the database, apply migrations, and run the two dev servers as described in [docs/phase8/operations.md](docs/phase8/operations.md).
+Windows development steps are in [docs/phase8/local-windows.md](docs/phase8/local-windows.md). Self-hosting on a machine you operate is in [docs/phase8/self-hosted.md](docs/phase8/self-hosted.md). Recovery notes are in [docs/phase8/operations.md](docs/phase8/operations.md).
 
 ```
 npm test
 ```
 
-Run the API tests from the repository root. They use the local database.
+Run the API tests from the repository root only against a database you can reset. The suite deletes tenant rows in the database named by `DATABASE_URL`.
 
 Secrets belong in `.env`, which is gitignored. Do not commit passwords, authenticator secrets, or the backup key.

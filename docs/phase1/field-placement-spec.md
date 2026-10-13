@@ -234,6 +234,17 @@ What is known without guessing a scale:
 
 A later calibration pass must invert the page transform and record page-point rectangles before any overlay is drawn. Until that pass, the policy acknowledgement signature and stamp are not placeable.
 
+## Operator pass on 13 October 2026
+
+A read of the four source content streams recorded only rectangles the PDF `re` operator already draws. No answer box was estimated from a label.
+
+- The KYC letterhead operator is `36.55 734.62 123.75 78.6 re`. That matches the measured placement already stored for `kyc.letterhead.myka`. It is not an incorrect rectangle.
+- The KYC form also draws table cells and hairline rules. A cell rectangle is not a field key, so those cells stay unassigned and the answer slots stay `unresolved`.
+- The responsible sourcing policy content streams contain no `re` operator. Name, Signature, and Stamp stay `unresolved`.
+- The PEP declaration draws eleven ballot rectangles, about 12.75 by 8.25, including a pair near y 369 and y 330 and a column near x 129.5. The PEP questionnaire draws twelve ballot rectangles, about 10.15 by 10.5, in pairs near the YES/NO lines. Those marks are source artwork. They are not paint slots, because the generator still blocks every form field until a named slot is reviewed. Underscore widths and signature image boxes stay `unresolved`.
+
+The package generator continues to paint only a measured customer letterhead and to return every form field as blocked.
+
 ## Signature evidence the overlay must not invent
 
 The placement spec positions images. It does not define a signature as verified. When a later phase stores a signature it must record method (image versus verifiable electronic signature), the explicit authorisation, consent, and the evidence reference. That record is data, not a coordinate.
