@@ -23,3 +23,16 @@ export function localDevelopmentTarget(env) {
 export function selectedDemoAccount(email) {
   return DEMO_MFA_ACCOUNTS.includes(email) ? email : null;
 }
+
+export function selectedRecoveryAccount(email, roles = []) {
+  if (typeof email !== 'string' || email.length === 0) {
+    return null;
+  }
+  if (DEMO_MFA_ACCOUNTS.includes(email)) {
+    return email;
+  }
+  if (Array.isArray(roles) && roles.includes('employee')) {
+    return email;
+  }
+  return null;
+}

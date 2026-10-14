@@ -229,10 +229,11 @@ export class AuthService {
     const now = Date.now();
     const recent = (this.attempts.get(email) ?? []).filter((at) => now - at < WINDOW_MS);
     if (recent.length >= MAX_ATTEMPTS) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((WINDOW_MS - (now - recent[0])) / 1000));
       const message = email.startsWith('mfa:')
         ? 'Too many verification attempts. Wait a minute and try again.'
         : 'Too many login attempts';
-      throw new HttpException(message, HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException({ message, retryAfterSeconds }, HttpStatus.TOO_MANY_REQUESTS);
     }
     recent.push(now);
     this.attempts.set(email, recent);

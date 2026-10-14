@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 
@@ -16,8 +16,11 @@ export function MfaForm() {
   const router = useRouter();
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [code, setCode] = useState('');
+  const [retryAfter, setRetryAfter] = useState(0);
   const [setupUri, setSetupUri] = useState('');
   const [qr, setQr] = useState('');
+  const submitting = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,27 +44,49 @@ export function MfaForm() {
     };
   }, []);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) {
+  useEffect(() => {
+    if (retryAfter <= 0) {
       return;
     }
+    const timer = window.setInterval(() => {
+      setRetryAfter((current) => (current <= 1 ? 0 : current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [retryAfter]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalized = code.trim();
+    if (!/^\d{6}$/.test(normalized) || submitting.current || retryAfter > 0) {
+      return;
+    }
+    submitting.current = true;
     setPending(true);
     setError('');
-    const form = new FormData(event.currentTarget);
     const response = await fetch('/api/auth/mfa', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: form.get('code') }),
+      body: JSON.stringify({ code: normalized }),
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+      const body = (await response.json().catch(() => null)) as {
+        message?: string | string[];
+        retryAfterSeconds?: number;
+      } | null;
       const message = Array.isArray(body?.message) ? body.message[0] : body?.message;
+      setRetryAfter(typeof body?.retryAfterSeconds === 'number' ? body.retryAfterSeconds : 0);
+      submitting.current = false;
       setPending(false);
       setError(message || 'That code was not accepted.');
       return;
     }
     const meResponse = await fetch('/api/auth/me');
+    if (!meResponse.ok) {
+      submitting.current = false;
+      setPending(false);
+      setError('The session was not stored.');
+      return;
+    }
     const me = await meResponse.json();
     router.push(HOME[me.roles[0]] ?? '/login');
     router.refresh();
@@ -88,11 +113,14 @@ export function MfaForm() {
           autoComplete="one-time-code"
           pattern="[0-9]{6}"
           maxLength={6}
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
           required
         />
       </label>
       {error ? <p className="notice">{error}</p> : null}
-      <button type="submit" disabled={pending}>Continue</button>
+      {retryAfter > 0 ? <p>Try again in {retryAfter} seconds.</p> : null}
+      <button type="submit" disabled={pending || retryAfter > 0 || code.length !== 6}>Continue</button>
     </form>
   );
 }

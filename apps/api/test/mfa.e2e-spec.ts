@@ -34,6 +34,7 @@ describe('authenticator enrollment', () => {
     await createUser(admin, tenant.id, 'mfa-c@example.com', passwordHash, roles.customer, null);
     await createUser(admin, tenant.id, 'mfa-d@example.com', passwordHash, roles.employee, secretB);
     await createUser(admin, tenant.id, 'mfa-e@example.com', passwordHash, roles.maker, null);
+    await createUser(admin, tenant.id, 'mfa-g@example.com', passwordHash, roles.maker, secretA);
     const broken = await createUser(admin, tenant.id, 'mfa-f@example.com', passwordHash, roles.maker, null);
     await admin.user.update({ where: { id: broken.id }, data: { mfaSecret: 'not-a-secret' } });
 
@@ -79,6 +80,30 @@ describe('authenticator enrollment', () => {
     await unenrolled.post('/auth/mfa').send({ code: '123456' }).expect(403);
     const broken = await login('mfa-f@example.com');
     await broken.post('/auth/mfa').send({ code: '123456' }).expect(401);
+  });
+
+  it('returns the same setup secret for a second request', async () => {
+    const maker = await login('mfa-e@example.com');
+    const first = await maker.get('/auth/mfa/setup').expect(200);
+    const second = await maker.get('/auth/mfa/setup').expect(200);
+    expect(second.body.otpauthUri).toBe(first.body.otpauthUri);
+  });
+
+  it('reports how long to wait after too many verification attempts', async () => {
+    const before = await admin.user.findUnique({ where: { email: 'mfa-g@example.com' } });
+    const maker = await login('mfa-g@example.com');
+    const wrong = codeAt(secretA, 0);
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await maker.post('/auth/mfa').send({ code: wrong }).expect(401);
+    }
+    const limited = await maker.post('/auth/mfa').send({ code: wrong }).expect(429);
+    expect(limited.body.message).toContain('Too many verification attempts');
+    expect(limited.body.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(limited.body.retryAfterSeconds).toBeLessThanOrEqual(60);
+    const after = await admin.user.findUnique({ where: { email: 'mfa-g@example.com' } });
+    expect(after?.mfaEnrolledAt).toBeNull();
+    expect(after?.passwordHash).toBe(before?.passwordHash);
+    expect(after?.mfaSecret).toBe(before?.mfaSecret);
   });
 
   it('hides setup in production and from a customer', async () => {

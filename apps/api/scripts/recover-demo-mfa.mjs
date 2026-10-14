@@ -1,21 +1,29 @@
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
-import { localDevelopmentTarget, selectedDemoAccount } from './demo-mfa.mjs';
+import { localDevelopmentTarget, selectedRecoveryAccount } from './demo-mfa.mjs';
 
 dotenv.config({ path: new URL('../../../.env', import.meta.url) });
 
-const email = selectedDemoAccount(process.argv[2]);
+const requested = process.argv[2];
 if (!localDevelopmentTarget(process.env)) {
   console.error('Refusing MFA recovery: this command runs only against the local development database.');
   process.exit(1);
 }
-if (!email) {
-  console.error('Refusing MFA recovery: name one existing local demo account.');
-  process.exit(1);
-}
 
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
-const user = await prisma.user.findUnique({ where: { email }, select: { id: true, tenantId: true } });
+const user = requested
+  ? await prisma.user.findUnique({
+      where: { email: requested },
+      select: { id: true, tenantId: true, roles: { select: { role: { select: { key: true } } } } },
+    })
+  : null;
+const roles = user?.roles.map((row) => row.role.key) ?? [];
+const email = selectedRecoveryAccount(requested, roles);
+if (!email) {
+  console.error('Refusing MFA recovery: name one existing local demo account.');
+  await prisma.$disconnect();
+  process.exit(1);
+}
 if (!user) {
   console.log(`missing ${email}`);
   await prisma.$disconnect();
