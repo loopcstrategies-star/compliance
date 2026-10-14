@@ -7,11 +7,14 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   return (
-    <main>
-      <h1>Sign in</h1>
-      <p>Use the account issued for your organisation.</p>
-      {params.denied ? <p className="notice">That area is not available for this role.</p> : null}
-      <LoginForm />
+    <main className="gate">
+      <section className="card">
+        <p className="brand">MYKA</p>
+        <h1>Sign in</h1>
+        <p>Use the account issued for your organisation.</p>
+        {params.denied ? <p className="notice error">That area is not available for this role.</p> : null}
+        <LoginForm />
+      </section>
     </main>
   );
 }

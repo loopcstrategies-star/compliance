@@ -38,7 +38,7 @@ export function AcceptForm({ token }: { token: string }) {
         Password
         <input name="password" type="password" autoComplete="new-password" minLength={10} required />
       </label>
-      {error ? <p className="notice">{error}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
       <button type="submit">Create account</button>
     </form>
   );

@@ -62,8 +62,8 @@ export function SegregationForm({ tenants }: { tenants: { id: string; name: stri
         <input name="makerDistinctFromApprover" type="checkbox" defaultChecked />
         Maker and authorised approver are different people
       </label>
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="submit">Save segregation policy</button>
     </form>
   );

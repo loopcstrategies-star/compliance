@@ -22,6 +22,7 @@ Copy `.env.example` to `.env` in the repository root. Set these names on that ma
 - `FILE_STORAGE_DIR` for a private folder, or leave it empty to use `apps/api/storage`
 - `SEED_DEMO_PASSWORD` only when creating local development accounts
 - `BACKUP_ENCRYPTION_KEY` as 32 random bytes of base64, in `.env` or the Windows user environment, not in git
+- `LOCAL_MFA_DEFER` as `true` only on this machine when you want staff sign-in to skip the authenticator screen. Remove it, or set it to anything other than `true`, to show the screen again. The API ignores it unless `NODE_ENV` is not `production` and `DATABASE_URL` is local `myka` on port `54329`. The API refuses to start in production when the value is `true`. Enrollment rows stay stored, and `POST /auth/mfa` still checks a real code.
 
 `FILE_STORAGE_DIR` and `apps/api/storage` are outside git. Files written there remain after the API process stops.
 

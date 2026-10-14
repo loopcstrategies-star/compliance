@@ -57,8 +57,8 @@ export function InviteForm() {
           ))}
         </select>
       </label>
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="submit">Issue invitation</button>
     </form>
   );

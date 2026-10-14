@@ -63,11 +63,11 @@ export function LoginForm() {
       <label>
         Password
         <input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required />
-        <button type="button" onClick={() => setShowPassword((current) => !current)}>
+        <button className="secondary" type="button" onClick={() => setShowPassword((current) => !current)}>
           {showPassword ? 'Hide password' : 'Show password'}
         </button>
       </label>
-      {error ? <p className="notice">{error}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
       <button type="submit" disabled={pending}>Sign in</button>
     </form>
   );

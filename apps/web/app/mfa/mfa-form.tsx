@@ -118,7 +118,7 @@ export function MfaForm() {
           required
         />
       </label>
-      {error ? <p className="notice">{error}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
       {retryAfter > 0 ? <p>Try again in {retryAfter} seconds.</p> : null}
       <button type="submit" disabled={pending || retryAfter > 0 || code.length !== 6}>Continue</button>
     </form>

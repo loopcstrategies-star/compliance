@@ -14,12 +14,29 @@ export default async function AdminPage() {
     (await apiGet<{ templateId: string; letterheadOwner: string; pageCount: number }[]>('/templates')) ?? [];
   return (
     <Shell title="Super-admin" me={me}>
-      <p>Tenant administration does not include customer identity files.</p>
-      <CategoryForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
-      <LetterheadForm tenants={tenants.filter((tenant) => !tenant.isSystem)} templates={templates} />
-      <SegregationForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
-      <OperationsForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
-      <TenantAdminForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
+      <p className="notice">Tenant administration does not include customer identity files.</p>
+      <nav className="section-nav">
+        <a href="#forms">Required forms</a>
+        <a href="#letterhead">Letterhead</a>
+        <a href="#segregation">Segregation of duties</a>
+        <a href="#operations">Operations</a>
+        <a href="#tenants">Staff and retention</a>
+      </nav>
+      <section id="forms">
+        <CategoryForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
+      </section>
+      <section id="letterhead">
+        <LetterheadForm tenants={tenants.filter((tenant) => !tenant.isSystem)} templates={templates} />
+      </section>
+      <section id="segregation">
+        <SegregationForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
+      </section>
+      <section id="operations">
+        <OperationsForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
+      </section>
+      <section id="tenants">
+        <TenantAdminForm tenants={tenants.filter((tenant) => !tenant.isSystem)} />
+      </section>
     </Shell>
   );
 }

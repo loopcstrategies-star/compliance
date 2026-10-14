@@ -106,6 +106,14 @@ describe('authenticator enrollment', () => {
     expect(after?.mfaSecret).toBe(before?.mfaSecret);
   });
 
+  it('keeps MFA mandatory when the database is not local myka', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'mfa-a@example.com', password: PASSWORD });
+    expect(response.status).toBe(201);
+    expect(response.body.mfaRequired).toBe(true);
+  });
+
   it('hides setup in production and from a customer', async () => {
     const customer = await request.agent(app.getHttpServer());
     const response = await customer.post('/auth/login').send({ email: 'mfa-c@example.com', password: PASSWORD });

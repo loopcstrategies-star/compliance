@@ -33,8 +33,8 @@ export function SubmitCase({ draft }: { draft: Draft }) {
           Submit for review
         </button>
       ) : null}
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
     </section>
   );
 }

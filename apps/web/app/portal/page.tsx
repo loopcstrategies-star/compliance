@@ -12,6 +12,14 @@ export default async function PortalPage() {
     <Shell title="Customer portal" me={me}>
       {draft ? (
         <>
+          <ol className="stepper">
+            <li>Company details</li>
+            <li>Documents</li>
+            <li>Submit</li>
+          </ol>
+          <p className="notice">
+            {draft.application.customerType.replaceAll('_', ' ')} · {draft.application.status.replaceAll('_', ' ')} · version {draft.application.documentVersion}
+          </p>
           <DraftForm draft={draft} />
           <DocumentsPanel draft={draft} />
           <SubmitCase draft={draft} />
