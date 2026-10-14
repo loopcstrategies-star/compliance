@@ -33,6 +33,9 @@ describe('authenticator enrollment', () => {
     await createUser(admin, tenant.id, 'mfa-b@example.com', passwordHash, roles.checker, secretB);
     await createUser(admin, tenant.id, 'mfa-c@example.com', passwordHash, roles.customer, null);
     await createUser(admin, tenant.id, 'mfa-d@example.com', passwordHash, roles.employee, secretB);
+    await createUser(admin, tenant.id, 'mfa-e@example.com', passwordHash, roles.maker, null);
+    const broken = await createUser(admin, tenant.id, 'mfa-f@example.com', passwordHash, roles.maker, null);
+    await admin.user.update({ where: { id: broken.id }, data: { mfaSecret: 'not-a-secret' } });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -64,9 +67,27 @@ describe('authenticator enrollment', () => {
     await second.post('/auth/mfa').send({ code: codeAt(secretB, Date.now()) }).expect(201);
   });
 
+  it('rejects a code outside the clock-drift window and a malformed code', async () => {
+    const maker = await login('mfa-a@example.com');
+    await maker.post('/auth/mfa').send({ code: codeAt(secretA, Date.now() - 60_000) }).expect(401);
+    await maker.post('/auth/mfa').send({ code: '12' }).expect(400);
+    await maker.post('/auth/mfa').send({ code: codeAt(secretA, Date.now()) }).expect(201);
+  });
+
+  it('rejects a missing or unreadable authenticator secret', async () => {
+    const unenrolled = await login('mfa-e@example.com');
+    await unenrolled.post('/auth/mfa').send({ code: '123456' }).expect(403);
+    const broken = await login('mfa-f@example.com');
+    await broken.post('/auth/mfa').send({ code: '123456' }).expect(401);
+  });
+
   it('hides setup in production and from a customer', async () => {
-    const customer = await login('mfa-c@example.com');
+    const customer = await request.agent(app.getHttpServer());
+    const response = await customer.post('/auth/login').send({ email: 'mfa-c@example.com', password: PASSWORD });
+    expect(response.status).toBe(201);
+    expect(response.body.mfaRequired).toBe(false);
     await customer.get('/auth/mfa/setup').expect(404);
+    await customer.get('/dashboard').expect(403);
 
     const pending = await login('mfa-d@example.com');
     process.env.NODE_ENV = 'production';

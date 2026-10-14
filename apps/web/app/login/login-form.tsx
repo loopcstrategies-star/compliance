@@ -15,9 +15,15 @@ const HOME: Record<string, string> = {
 export function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [pending, setPending] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) {
+      return;
+    }
+    setPending(true);
     setError('');
     const form = new FormData(event.currentTarget);
     const response = await fetch('/api/auth/login', {
@@ -29,11 +35,13 @@ export function LoginForm() {
       }),
     });
     if (!response.ok) {
+      setPending(false);
       setError('Those details were not accepted.');
       return;
     }
     const meResponse = await fetch('/api/auth/me');
     if (!meResponse.ok) {
+      setPending(false);
       setError('The session was not stored.');
       return;
     }
@@ -54,10 +62,13 @@ export function LoginForm() {
       </label>
       <label>
         Password
-        <input name="password" type="password" autoComplete="current-password" required />
+        <input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required />
+        <button type="button" onClick={() => setShowPassword((current) => !current)}>
+          {showPassword ? 'Hide password' : 'Show password'}
+        </button>
       </label>
       {error ? <p className="notice">{error}</p> : null}
-      <button type="submit">Sign in</button>
+      <button type="submit" disabled={pending}>Sign in</button>
     </form>
   );
 }

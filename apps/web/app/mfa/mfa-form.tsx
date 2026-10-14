@@ -15,6 +15,7 @@ const HOME: Record<string, string> = {
 export function MfaForm() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
   const [setupUri, setSetupUri] = useState('');
   const [qr, setQr] = useState('');
 
@@ -42,6 +43,10 @@ export function MfaForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) {
+      return;
+    }
+    setPending(true);
     setError('');
     const form = new FormData(event.currentTarget);
     const response = await fetch('/api/auth/mfa', {
@@ -50,7 +55,10 @@ export function MfaForm() {
       body: JSON.stringify({ code: form.get('code') }),
     });
     if (!response.ok) {
-      setError('That code was not accepted.');
+      const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+      const message = Array.isArray(body?.message) ? body.message[0] : body?.message;
+      setPending(false);
+      setError(message || 'That code was not accepted.');
       return;
     }
     const meResponse = await fetch('/api/auth/me');
@@ -71,12 +79,20 @@ export function MfaForm() {
           </label>
         </section>
       ) : null}
+      <p>Enter the current 6-digit code. A code from the previous or next 30 seconds is also accepted.</p>
       <label>
         Code
-        <input name="code" inputMode="numeric" autoComplete="one-time-code" required />
+        <input
+          name="code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9]{6}"
+          maxLength={6}
+          required
+        />
       </label>
       {error ? <p className="notice">{error}</p> : null}
-      <button type="submit">Continue</button>
+      <button type="submit" disabled={pending}>Continue</button>
     </form>
   );
 }
