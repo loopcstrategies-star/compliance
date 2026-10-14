@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -68,20 +69,31 @@ export class AuthService {
   }
 
   async confirmMfa(auth: AuthState, code: string): Promise<{ mfaSatisfied: true }> {
+    const normalized = code.trim();
+    if (!/^\d{6}$/.test(normalized)) {
+      throw new BadRequestException('Enter the 6-digit code from your authenticator.');
+    }
+    this.assertWithinRateLimit(`mfa:${auth.userId}`);
     const user = await this.prisma.withTenant(auth.tenantId, (tx) =>
       tx.user.findUnique({ where: { id: auth.userId } }),
     );
     if (!user?.mfaSecret) {
       throw new ForbiddenException('MFA is not enrolled');
     }
+    let secret: OTPAuth.Secret;
+    try {
+      secret = OTPAuth.Secret.fromBase32(decryptSecret(user.mfaSecret));
+    } catch {
+      throw new UnauthorizedException('The authenticator enrollment cannot be read. Recover this account before trying again.');
+    }
     const totp = new OTPAuth.TOTP({
       algorithm: 'SHA1',
       digits: 6,
       period: 30,
-      secret: OTPAuth.Secret.fromBase32(decryptSecret(user.mfaSecret)),
+      secret,
     });
-    if (totp.validate({ token: code, window: 1 }) === null) {
-      throw new UnauthorizedException('Invalid code');
+    if (totp.validate({ token: normalized, window: 1 }) === null) {
+      throw new UnauthorizedException('That code is wrong or outside the 30-second clock-drift window.');
     }
     await this.prisma.withTenant(auth.tenantId, async (tx) => {
       await tx.session.update({ where: { id: auth.sessionId }, data: { mfaSatisfied: true } });
@@ -101,9 +113,19 @@ export class AuthService {
       if (!user || user.mfaEnrolledAt) {
         throw new NotFoundException('Not found');
       }
-      const plain = user.mfaSecret ? decryptSecret(user.mfaSecret) : new OTPAuth.Secret({ size: 20 }).base32;
+      let plain = user.mfaSecret ? decryptSecret(user.mfaSecret) : new OTPAuth.Secret({ size: 20 }).base32;
       if (!user.mfaSecret) {
-        await tx.user.update({ where: { id: user.id }, data: { mfaSecret: encryptSecret(plain) } });
+        const saved = await tx.user.updateMany({
+          where: { id: user.id, mfaSecret: null },
+          data: { mfaSecret: encryptSecret(plain) },
+        });
+        if (saved.count === 0) {
+          const current = await tx.user.findFirst({ where: { id: user.id, tenantId: auth.tenantId } });
+          if (!current?.mfaSecret) {
+            throw new NotFoundException('Not found');
+          }
+          plain = decryptSecret(current.mfaSecret);
+        }
       }
       const totp = new OTPAuth.TOTP({
         issuer: 'MYKA',
@@ -207,7 +229,11 @@ export class AuthService {
     const now = Date.now();
     const recent = (this.attempts.get(email) ?? []).filter((at) => now - at < WINDOW_MS);
     if (recent.length >= MAX_ATTEMPTS) {
-      throw new HttpException('Too many login attempts', HttpStatus.TOO_MANY_REQUESTS);
+      const retryAfterSeconds = Math.max(1, Math.ceil((WINDOW_MS - (now - recent[0])) / 1000));
+      const message = email.startsWith('mfa:')
+        ? 'Too many verification attempts. Wait a minute and try again.'
+        : 'Too many login attempts';
+      throw new HttpException({ message, retryAfterSeconds }, HttpStatus.TOO_MANY_REQUESTS);
     }
     recent.push(now);
     this.attempts.set(email, recent);
