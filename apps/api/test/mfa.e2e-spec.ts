@@ -106,7 +106,7 @@ describe('authenticator enrollment', () => {
     expect(after?.mfaSecret).toBe(before?.mfaSecret);
   });
 
-  it('keeps MFA mandatory when the database is not local myka', async () => {
+  it('requires MFA for a privileged login', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'mfa-a@example.com', password: PASSWORD });
