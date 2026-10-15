@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { Icon, iconFor } from './icons';
 
 export function StaffNav({ tabs }: { tabs: { href: string; label: string; group: string }[] }) {
   const pathname = usePathname();
@@ -29,6 +30,7 @@ function link(tab: { href: string; label: string }, pathname: string) {
   const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
   return (
     <a key={tab.href} href={tab.href} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}>
+      <Icon name={iconFor(tab.href)} />
       {tab.label}
     </a>
   );
