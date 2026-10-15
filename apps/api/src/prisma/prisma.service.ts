@@ -13,7 +13,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit(): Promise<void> {
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (error) {
+      const code = error instanceof Prisma.PrismaClientInitializationError ? error.errorCode : undefined;
+      console.error(code ? `Application database connection failed (${code})` : 'Application database connection failed');
+      throw error;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {

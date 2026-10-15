@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { logApiOriginError, readApiOrigin } from './api-origin';
 
 export async function apiGet<T>(path: string): Promise<T | null> {
   const jar = await cookies();
@@ -6,12 +7,25 @@ export async function apiGet<T>(path: string): Promise<T | null> {
   if (!session) {
     return null;
   }
-  const response = await fetch(`${process.env.API_INTERNAL_URL}${path}`, {
-    headers: { cookie: `myka_session=${session}` },
-    cache: 'no-store',
-  });
-  if (!response.ok) {
+  let origin: string;
+  try {
+    origin = readApiOrigin(process.env.API_INTERNAL_URL);
+  } catch (error) {
+    logApiOriginError(error);
     return null;
   }
-  return response.json() as Promise<T>;
+  try {
+    const response = await fetch(`${origin}${path}`, {
+      headers: { cookie: `myka_session=${session}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return response.json() as Promise<T>;
+  } catch {
+    console.error('API request failed');
+    return null;
+  }
 }

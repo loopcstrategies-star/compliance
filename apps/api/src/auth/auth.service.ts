@@ -106,7 +106,7 @@ export class AuthService {
   }
 
   async setupMfa(auth: AuthState): Promise<{ otpauthUri: string }> {
-    if (process.env.NODE_ENV === 'production' || !auth.privileged) {
+    if (!auth.privileged) {
       throw new NotFoundException('Not found');
     }
     return this.prisma.withTenant(auth.tenantId, async (tx) => {

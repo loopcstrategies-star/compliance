@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { logApiOriginError, readApiOrigin } from './api-origin';
 
 export type Me = {
   userId: string;
@@ -17,14 +18,27 @@ export async function loadMe(): Promise<Me | null> {
   if (!session) {
     return null;
   }
-  const response = await fetch(`${process.env.API_INTERNAL_URL}/auth/me`, {
-    headers: { cookie: `myka_session=${session}` },
-    cache: 'no-store',
-  });
-  if (!response.ok) {
-    return null;
+  let origin: string;
+  try {
+    origin = readApiOrigin(process.env.API_INTERNAL_URL);
+  } catch (error) {
+    logApiOriginError(error);
+    throw new Error('The service is temporarily unavailable.');
   }
-  return response.json() as Promise<Me>;
+  try {
+    const response = await fetch(`${origin}/auth/me`, {
+      headers: { cookie: `myka_session=${session}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return response.json() as Promise<Me>;
+  } catch {
+    console.error('API request failed');
+    throw new Error('The service is temporarily unavailable.');
+  }
 }
 
 export async function requireArea(allowed: string[]): Promise<Me> {
