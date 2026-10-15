@@ -80,8 +80,8 @@ export function DraftForm({ draft }: { draft: Draft }) {
           ))}
         </section>
       ) : null}
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="button" onClick={save}>
         Save draft
       </button>

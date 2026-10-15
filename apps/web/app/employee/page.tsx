@@ -36,15 +36,13 @@ export default async function EmployeePage() {
   return (
     <Shell title="Employee dashboard" me={me}>
       <InviteForm />
-      <section>
-        <h2>Counts</h2>
-        <ul>
-          {LABELS.map(([key, label]) => (
-            <li key={key}>
-              {label}: {dashboard?.[key] ?? 0}
-            </li>
-          ))}
-        </ul>
+      <section className="metrics">
+        {LABELS.map(([key, label]) => (
+          <article key={key}>
+            <span>{label}</span>
+            <strong>{dashboard?.[key] ?? 0}</strong>
+          </article>
+        ))}
       </section>
       <AssignForm cases={dashboard?.cases ?? []} users={users} />
     </Shell>

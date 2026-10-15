@@ -20,6 +20,14 @@ export function ReviewQueue({ cases, roles }: { cases: ReviewCase[]; roles: stri
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const statuses = [...new Set(cases.map((item) => item.status))];
+  const shown = cases.filter((item) => {
+    const haystack = `${item.customer.legalName} ${item.customer.customerType} ${item.status}`.toLowerCase();
+    const matchesQuery = haystack.includes(query.trim().toLowerCase());
+    return matchesQuery && (status === 'all' || item.status === status);
+  });
 
   async function decide(event: FormEvent<HTMLFormElement>, item: ReviewCase) {
     event.preventDefault();
@@ -49,8 +57,35 @@ export function ReviewQueue({ cases, roles }: { cases: ReviewCase[]; roles: stri
   return (
     <section>
       <h2>Cases</h2>
-      {cases.length === 0 ? <p className="notice">No cases are waiting in this tenant.</p> : null}
-      {cases.map((item) => {
+      <div className="metrics">
+        <article>
+          <span>In this queue</span>
+          <strong>{cases.length}</strong>
+        </article>
+        {statuses.map((item) => (
+          <article key={item}>
+            <span>{item.replaceAll('_', ' ')}</span>
+            <strong>{cases.filter((entry) => entry.status === item).length}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="filters">
+        <label>
+          Search
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, type, or status" />
+        </label>
+        <label>
+          Status
+          <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="all">All statuses</option>
+            {statuses.map((item) => (
+              <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {shown.length === 0 ? <p className="notice">No cases match this view.</p> : null}
+      {shown.map((item) => {
         const stage = STAGE_FOR[item.status];
         const allowed = stage ? roles.includes(stage === 'authorised_approver' ? 'authorised_approver' : stage) : false;
         return (
@@ -64,19 +99,21 @@ export function ReviewQueue({ cases, roles }: { cases: ReviewCase[]; roles: stri
                   Reason
                   <input name="reason" required />
                 </label>
-                <button type="submit" value="accept">
-                  Accept
-                </button>
-                <button type="submit" value="return">
-                  Return
-                </button>
+                <div className="actions">
+                  <button type="submit" value="accept">
+                    Accept
+                  </button>
+                  <button className="secondary" type="submit" value="return">
+                    Return
+                  </button>
+                </div>
               </form>
             ) : null}
           </article>
         );
       })}
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
     </section>
   );
 }

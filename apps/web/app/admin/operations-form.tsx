@@ -68,8 +68,8 @@ export function OperationsForm({ tenants }: { tenants: { id: string; name: strin
         Escalation email
         <input name="escalationEmail" type="email" />
       </label>
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="submit">Save operations settings</button>
     </form>
   );

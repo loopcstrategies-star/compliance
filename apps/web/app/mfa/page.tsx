@@ -11,10 +11,13 @@ export default async function MfaPage() {
     redirect('/login');
   }
   return (
-    <main>
-      <h1>Verification code</h1>
-      <p>Enter the code from your authenticator for {me.email}.</p>
-      <MfaForm />
+    <main className="gate">
+      <section className="card">
+        <p className="brand">MYKA</p>
+        <h1>Verification code</h1>
+        <p>Enter the code from your authenticator for {me.email}.</p>
+        <MfaForm />
+      </section>
     </main>
   );
 }

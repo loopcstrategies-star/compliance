@@ -148,8 +148,8 @@ export function DocumentsPanel({ draft }: { draft: Draft }) {
         </div>
       ))}
       {preview ? <p className="notice">{preview}</p> : null}
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
     </section>
   );
 }

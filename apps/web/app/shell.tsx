@@ -4,13 +4,16 @@ import { SignOut } from './sign-out';
 
 export function Shell({ title, me, children }: { title: string; me: Me; children?: ReactNode }) {
   return (
-    <main>
-      <h1>{title}</h1>
-      <p className="notice">
-        Signed in as {me.displayName} ({me.email}). Role: {me.roles.join(', ')}.
-      </p>
-      {children}
-      <SignOut />
-    </main>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <p className="brand">MYKA</p>
+        <h1>{title}</h1>
+        <p>{me.displayName}</p>
+        <p>{me.email}</p>
+        <p className="role">{me.roles.join(', ')}</p>
+        <SignOut />
+      </aside>
+      <main className="workspace">{children}</main>
+    </div>
   );
 }

@@ -54,8 +54,8 @@ export function AssignForm({ cases, users }: { cases: CaseRow[]; users: Person[]
           ))}
         </select>
       </label>
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="submit">Assign</button>
     </form>
   );

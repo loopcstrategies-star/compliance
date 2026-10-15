@@ -17,6 +17,7 @@ import { decryptSecret, encryptSecret, hashToken } from '../crypto/secrets';
 import { redact } from '../common/redact';
 import { PRIVILEGED_ROLES, SESSION_COOKIE, SESSION_TTL_MS } from '../domain';
 import type { AuthState } from './auth.types';
+import { localMfaDeferralAllowed } from './local-mfa';
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 10;
@@ -59,13 +60,13 @@ export class AuthService {
           userId: user.id,
           tokenHash: hashToken(raw),
           expiresAt,
-          mfaSatisfied: !profile.privileged,
+          mfaSatisfied: !profile.privileged || localMfaDeferralAllowed(process.env),
         },
       }),
     );
     this.setCookie(res, raw, expiresAt);
     this.logger.log(JSON.stringify(redact({ userId: user.id, outcome: 'session_created' })));
-    return { mfaRequired: profile.privileged };
+    return { mfaRequired: profile.privileged && !localMfaDeferralAllowed(process.env) };
   }
 
   async confirmMfa(auth: AuthState, code: string): Promise<{ mfaSatisfied: true }> {
@@ -105,7 +106,7 @@ export class AuthService {
   }
 
   async setupMfa(auth: AuthState): Promise<{ otpauthUri: string }> {
-    if (process.env.NODE_ENV === 'production' || !auth.privileged) {
+    if (!auth.privileged) {
       throw new NotFoundException('Not found');
     }
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
@@ -208,7 +209,7 @@ export class AuthService {
           userId,
           tokenHash: hashToken(raw),
           expiresAt,
-          mfaSatisfied: !profile.privileged,
+          mfaSatisfied: !profile.privileged || localMfaDeferralAllowed(process.env),
         },
       }),
     );

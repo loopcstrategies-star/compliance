@@ -45,8 +45,8 @@ export function CategoryForm({ tenants }: { tenants: { id: string; name: string 
         Label
         <input name="label" required />
       </label>
-      {error ? <p className="notice">{error}</p> : null}
-      {message ? <p className="notice">{message}</p> : null}
+      {error ? <p className="notice error">{error}</p> : null}
+      {message ? <p className="notice success">{message}</p> : null}
       <button type="submit">Add category</button>
     </form>
   );

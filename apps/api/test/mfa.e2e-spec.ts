@@ -106,7 +106,15 @@ describe('authenticator enrollment', () => {
     expect(after?.mfaSecret).toBe(before?.mfaSecret);
   });
 
-  it('hides setup in production and from a customer', async () => {
+  it('requires MFA for a privileged login', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'mfa-a@example.com', password: PASSWORD });
+    expect(response.status).toBe(201);
+    expect(response.body.mfaRequired).toBe(true);
+  });
+
+  it('hides setup from a customer and returns a QR for an unenrolled staff user in production', async () => {
     const customer = await request.agent(app.getHttpServer());
     const response = await customer.post('/auth/login').send({ email: 'mfa-c@example.com', password: PASSWORD });
     expect(response.status).toBe(201);
@@ -117,7 +125,8 @@ describe('authenticator enrollment', () => {
     const pending = await login('mfa-d@example.com');
     process.env.NODE_ENV = 'production';
     try {
-      await pending.get('/auth/mfa/setup').expect(404);
+      const setup = await pending.get('/auth/mfa/setup').expect(200);
+      expect(setup.body.otpauthUri).toContain('otpauth://totp/');
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
     }

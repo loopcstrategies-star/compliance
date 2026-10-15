@@ -180,8 +180,8 @@ export function TenantAdminForm({ tenants }: { tenants: { id: string; name: stri
           Effective from
           <input name="effectiveFrom" type="date" required />
         </label>
-        {error ? <p className="notice">{error}</p> : null}
-        {message ? <p className="notice">{message}</p> : null}
+        {error ? <p className="notice error">{error}</p> : null}
+        {message ? <p className="notice success">{message}</p> : null}
         <button type="submit">Save retention</button>
       </form>
     </section>

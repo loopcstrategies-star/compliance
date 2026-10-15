@@ -1,17 +1,39 @@
 import { NextRequest } from 'next/server';
+import { ApiOriginError, logApiOriginError, readApiOrigin } from '../../../lib/api-origin';
+
+function unavailable(): Response {
+  return Response.json({ message: 'The service is temporarily unavailable.' }, { status: 503 });
+}
 
 async function proxy(request: NextRequest, path: string[]): Promise<Response> {
-  const target = new URL(`${process.env.API_INTERNAL_URL}/${path.join('/')}`);
+  let origin: string;
+  try {
+    origin = readApiOrigin(process.env.API_INTERNAL_URL);
+  } catch (error) {
+    logApiOriginError(error);
+    if (error instanceof ApiOriginError) {
+      return unavailable();
+    }
+    throw error;
+  }
+  const target = new URL(`${origin}/${path.join('/')}`);
   target.search = request.nextUrl.search;
   const headers = new Headers(request.headers);
   headers.delete('host');
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
-  const upstream = await fetch(target, {
-    method: request.method,
-    headers,
-    body: hasBody ? Buffer.from(await request.arrayBuffer()) : undefined,
-    redirect: 'manual',
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      body: hasBody ? Buffer.from(await request.arrayBuffer()) : undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    console.error('API request failed');
+    return unavailable();
+  }
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
     if (key.toLowerCase() !== 'set-cookie') {
