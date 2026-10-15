@@ -7,7 +7,8 @@
     "build": "prisma generate && nest build",
     "test": "node scripts/run-tests.js",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "bootstrap:production": "node scripts/bootstrap-production.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

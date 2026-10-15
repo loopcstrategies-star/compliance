@@ -9,7 +9,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { argon2id, hash, verify } from 'argon2';
+import { verify } from 'argon2';
+import { hashPassword } from './password';
 import * as OTPAuth from 'otpauth';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
@@ -237,6 +238,4 @@ export class AuthService {
   }
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  return hash(password, { type: argon2id });
-}
+export { hashPassword };
