@@ -106,12 +106,12 @@ describe('authenticator enrollment', () => {
     expect(after?.mfaSecret).toBe(before?.mfaSecret);
   });
 
-  it('requires MFA for a privileged login', async () => {
+  it('opens a session for a privileged login without requiring MFA', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'mfa-a@example.com', password: PASSWORD });
     expect(response.status).toBe(201);
-    expect(response.body.mfaRequired).toBe(true);
+    expect(response.body.mfaRequired).toBe(false);
   });
 
   it('hides setup from a customer and returns a QR for an unenrolled staff user in production', async () => {

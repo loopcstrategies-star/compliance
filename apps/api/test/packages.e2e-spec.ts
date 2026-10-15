@@ -126,7 +126,6 @@ describe('packages and uploads', () => {
     expect(JSON.stringify(hidden.body)).not.toContain('Local Docs');
 
     const platform = await login('admin@example.com');
-    await satisfyMfa(platform, adminSecret);
     await platform.get(`/files/${fileId}`).expect(403);
 
     const reader = await login('reader-a@example.com');
@@ -185,7 +184,6 @@ describe('packages and uploads', () => {
   it('draws customer letterhead only inside the measured KYC rectangle', async () => {
     const local = await login('local-docs@example.com');
     const platform = await login('admin@example.com');
-    await satisfyMfa(platform, adminSecret);
     const originals = Object.fromEntries(
       (await admin.templateVersion.findMany()).map((template) => [template.templateId, template.sha256]),
     );
@@ -236,15 +234,6 @@ describe('packages and uploads', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 async function contentText(bytes: Buffer): Promise<string> {

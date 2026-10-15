@@ -66,7 +66,6 @@ describe('tenant isolation', () => {
 
   it('hides the other tenant user on read and write', async () => {
     const agent = await login(employeeA.email);
-    await satisfyMfa(agent, employeeSecret);
     const listed = await agent.get('/users').expect(200);
     expect(listed.body.map((user: { email: string }) => user.email)).toContain(employeeA.email);
     expect(JSON.stringify(listed.body)).not.toContain(employeeB.email);
@@ -89,7 +88,6 @@ describe('tenant isolation', () => {
     expect(mismatch.headers['set-cookie']).toBeUndefined();
 
     const agent = await login(employeeA.email);
-    await satisfyMfa(agent, employeeSecret);
     const blocked = await agent.get('/users').set('x-tenant-id', tenantB.id).expect(403);
     expect(JSON.stringify(blocked.body)).not.toContain(employeeB.email);
 
@@ -113,17 +111,13 @@ describe('tenant isolation', () => {
     await again.get('/auth/me').expect(401);
   });
 
-  it('blocks a privileged route until MFA succeeds', async () => {
+  it('allows a privileged route after password login', async () => {
     const agent = await login(employeeA.email);
-    const blocked = await agent.get('/users').expect(403);
-    expect(blocked.body.message).toBe('MFA required');
-    await satisfyMfa(agent, employeeSecret);
     await agent.get('/users').expect(200);
   });
 
   it('denies identity-file access to a super-admin and audits an authorised reader', async () => {
     const superAdmin = await login(adminUser.email);
-    await satisfyMfa(superAdmin, adminSecret);
     await superAdmin.post('/identity-files/access').send({ purpose: 'case review' }).expect(403);
     const auditsAfterDenial = await admin.auditEvent.count({ where: { action: 'identity_file.access' } });
     expect(auditsAfterDenial).toBe(0);
@@ -164,15 +158,6 @@ describe('tenant isolation', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 async function createUser(

@@ -126,6 +126,7 @@ h2 {
 
 .gate .card {
   width: min(100%, 28rem);
+  border-top: 4px solid var(--navy);
 }
 
 .brand {
@@ -160,8 +161,26 @@ h2 {
   margin: 0;
 }
 
-.sidebar .role {
-  color: #cbd5e1;
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+}
+
+.sidebar nav a {
+  color: #e2e8f0;
+  text-decoration: none;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+}
+
+.sidebar nav a:hover,
+.sidebar nav a:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar .role {  color: #cbd5e1;
   font-size: 0.9rem;
 }
 

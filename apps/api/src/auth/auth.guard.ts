@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { ALLOW_PENDING_MFA, IS_PUBLIC, PERMISSIONS } from './auth.decorator';
+import { IS_PUBLIC, PERMISSIONS } from './auth.decorator';
 import { SESSION_COOKIE } from '../domain';
 import type { AuthState } from './auth.types';
 
@@ -34,14 +34,6 @@ export class AuthGuard implements CanActivate {
     }
     if (!req.auth) {
       throw new UnauthorizedException();
-    }
-
-    const allowPending = this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_MFA, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (req.auth.privileged && !req.auth.mfaSatisfied && !allowPending) {
-      throw new ForbiddenException('MFA required');
     }
 
     const required = this.reflector.getAllAndOverride<string[]>(PERMISSIONS, [

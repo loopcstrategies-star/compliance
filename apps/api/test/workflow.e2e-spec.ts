@@ -84,14 +84,12 @@ describe('maker checker workflow', () => {
 
     const submitted = await customer.post(`/applications/${applicationA.id}/submit`).expect(201);
     const maker = await login('maker-review@example.com');
-    await satisfyMfa(maker, makerSecret);
     await maker
       .post(`/applications/${applicationA.id}/decisions`)
       .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'final', documentVersion: submitted.body.documentVersion })
       .expect(403);
 
     const dual = await login('dual-review@example.com');
-    await satisfyMfa(dual, dualSecret);
     await dual
       .post(`/applications/${applicationA.id}/decisions`)
       .send({ stage: 'maker', outcome: 'accept', reason: 'maker accept', documentVersion: submitted.body.documentVersion })
@@ -103,7 +101,6 @@ describe('maker checker workflow', () => {
     expect(overlap.body.message).toBe('Segregation policy rejects this assignment');
 
     const checker = await login('checker-review@example.com');
-    await satisfyMfa(checker, checkerSecret);
     await checker
       .post(`/applications/${applicationA.id}/decisions`)
       .send({ stage: 'checker', outcome: 'accept', reason: 'checker accept', documentVersion: submitted.body.documentVersion })
@@ -118,7 +115,6 @@ describe('maker checker workflow', () => {
     const customer = await login('customer-review@example.com');
     const submitted = await customer.post(`/applications/${applicationB.id}/submit`).expect(201);
     const maker = await login('maker-review@example.com');
-    await satisfyMfa(maker, makerSecret);
     await maker
       .post(`/applications/${applicationB.id}/decisions`)
       .send({ stage: 'maker', outcome: 'return', reason: 'missing licence', documentVersion: submitted.body.documentVersion })
@@ -126,7 +122,6 @@ describe('maker checker workflow', () => {
     const decisions = await admin.reviewDecision.findMany({ where: { submission: { applicationId: applicationB.id } } });
     expect(decisions.every((item) => item.supersededAt)).toBe(true);
     const checker = await login('checker-review@example.com');
-    await satisfyMfa(checker, checkerSecret);
     await checker
       .post(`/applications/${applicationB.id}/decisions`)
       .send({ stage: 'checker', outcome: 'accept', reason: 'too soon', documentVersion: submitted.body.documentVersion })
@@ -135,7 +130,6 @@ describe('maker checker workflow', () => {
     const generated = await customer.post(`/applications/${applicationA.id}/packages`).send({ templateId: 'kyc' }).expect(201);
     const before = await admin.storedFile.findUniqueOrThrow({ where: { id: generated.body.fileId } });
     const approver = await login('approver-review@example.com');
-    await satisfyMfa(approver, approverSecret);
     const stale = await approver
       .post(`/applications/${applicationA.id}/decisions`)
       .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'old version', documentVersion: 1 })
@@ -153,11 +147,8 @@ describe('maker checker workflow', () => {
     const resubmitted = await customer.post(`/applications/${applicationA.id}/submit`).expect(201);
     const version = resubmitted.body.documentVersion as number;
     const maker = await login('maker-review@example.com');
-    await satisfyMfa(maker, makerSecret);
     const checker = await login('checker-review@example.com');
-    await satisfyMfa(checker, checkerSecret);
     const approver = await login('approver-review@example.com');
-    await satisfyMfa(approver, approverSecret);
     expect(current.body.application.status).toBe('correction');
     await maker
       .post(`/applications/${applicationA.id}/decisions`)
@@ -188,6 +179,45 @@ describe('maker checker workflow', () => {
     expect(applicationC.id).toBeTruthy();
   });
 
+  it('lets the same actor take the next stage when the three switches are off', async () => {
+    await admin.segregationPolicy.upsert({
+      where: { tenantId: tenantA.id },
+      create: {
+        tenantId: tenantA.id,
+        makerDistinctFromChecker: false,
+        checkerDistinctFromApprover: false,
+        makerDistinctFromApprover: false,
+      },
+      update: {
+        makerDistinctFromChecker: false,
+        checkerDistinctFromApprover: false,
+        makerDistinctFromApprover: false,
+      },
+    });
+    const customerRow = await admin.user.findUniqueOrThrow({ where: { email: 'customer-review@example.com' } });
+    const party = await admin.customer.findFirstOrThrow({ where: { userId: customerRow.id } });
+    const application = await admin.application.create({ data: { tenantId: tenantA.id, customerId: party.id } });
+    const customer = await login('customer-review@example.com');
+    const submitted = await customer.post(`/applications/${application.id}/submit`).expect(201);
+    const dual = await login('dual-review@example.com');
+    const version = submitted.body.documentVersion;
+    await dual
+      .post(`/applications/${application.id}/decisions`)
+      .send({ stage: 'maker', outcome: 'accept', reason: 'maker accept', documentVersion: version })
+      .expect(201);
+    await dual
+      .post(`/applications/${application.id}/decisions`)
+      .send({ stage: 'checker', outcome: 'accept', reason: 'same authorised person', documentVersion: version })
+      .expect(201);
+    const rows = await admin.reviewDecision.findMany({
+      where: { submission: { applicationId: application.id } },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(rows.map((row) => row.stage)).toEqual(['maker', 'checker']);
+    expect(new Set(rows.map((row) => row.actorId)).size).toBe(1);
+    expect(rows.every((row) => row.outcome === 'accept' && row.reason.length > 0 && row.createdAt instanceof Date)).toBe(true);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });
@@ -195,15 +225,6 @@ describe('maker checker workflow', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 async function createUser(
