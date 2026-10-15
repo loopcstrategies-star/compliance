@@ -14,7 +14,7 @@ export function Shell({ title, me, children }: { title: string; me: Me; children
         <p>{me.displayName}</p>
         <p>{me.email}</p>
         <p className="role">{me.roles.join(', ')}</p>
-        <StaffNav tabs={staffTabs.map((tab) => ({ href: tab.href, label: tab.label }))} />
+        <StaffNav tabs={staffTabs.map((tab) => ({ href: tab.href, label: tab.label, group: tab.group }))} />
         <SignOut />
       </aside>
       <main className="workspace">{children}</main>

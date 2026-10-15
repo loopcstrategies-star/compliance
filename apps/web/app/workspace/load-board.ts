@@ -4,8 +4,13 @@ import type { QueueItem } from './queue';
 
 export type Board = {
   tenantId: string;
-  counts: { requests: number; waiting: number; corrections: number; customers: number; overdue: number };
+  windowDays?: number;
+  counts: { requests: number; waiting: number; corrections: number; customers: number; overdue: number; total?: number };
   items: QueueItem[];
+  distribution?: { status: string; count: number }[];
+  recent?: QueueItem[];
+  waitingPreview?: (QueueItem & { dueAt?: string | null })[];
+  expiring?: { id: string; applicationId: string; legalName: string; document: string; expiresOn: string; status: string }[];
 };
 
 type Tenant = { id: string; name: string; isSystem: boolean };
@@ -26,6 +31,7 @@ export async function resolveTenant(me: Me, requested?: string): Promise<{ tenan
   };
 }
 
-export async function loadBoard(view: string, tenantId: string): Promise<Board | null> {
-  return apiGet<Board>(`/applications?view=${encodeURIComponent(view)}&tenantId=${encodeURIComponent(tenantId)}`);
+export async function loadBoard(view: string, tenantId: string, days = 30): Promise<Board | null> {
+  const window = view === 'dashboard' ? `&days=${days}` : '';
+  return apiGet<Board>(`/applications?view=${encodeURIComponent(view)}&tenantId=${encodeURIComponent(tenantId)}${window}`);
 }

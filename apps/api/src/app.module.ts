@@ -26,6 +26,8 @@ import { OperationsController, OperationsPolicyController } from './operations/o
 import { OperationsService } from './operations/operations.service';
 import { AdministrationController, AuditController } from './administration/administration.controller';
 import { AdministrationService } from './administration/administration.service';
+import { CompanyKycController } from './company-kyc/company-kyc.controller';
+import { CompanyKycService } from './company-kyc/company-kyc.service';
 
 @Module({
   controllers: [
@@ -47,6 +49,7 @@ import { AdministrationService } from './administration/administration.service';
     OperationsPolicyController,
     AdministrationController,
     AuditController,
+    CompanyKycController,
   ],
   providers: [
     PrismaService,
@@ -59,6 +62,7 @@ import { AdministrationService } from './administration/administration.service';
     ReviewService,
     OperationsService,
     AdministrationService,
+    CompanyKycService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

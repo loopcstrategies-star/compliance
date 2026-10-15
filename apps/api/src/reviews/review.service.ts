@@ -59,12 +59,13 @@ export class ReviewService {
     );
   }
 
-  async board(auth: AuthState, view: string, requestedTenantId?: string) {
+  async board(auth: AuthState, view: string, requestedTenantId?: string, daysRaw?: string) {
     const tenantId = this.targetTenant(auth, requestedTenantId);
     const statuses = STATUSES_FOR[view];
     if (!statuses && view !== 'dashboard') {
       throw new BadRequestException('Queue is invalid');
     }
+    const windowDays = daysRaw === '60' ? 60 : daysRaw === '90' ? 90 : 30;
     return this.prisma.withTenant(tenantId, async (tx) => {
       const policy = await tx.operationsPolicy.findUnique({ where: { tenantId } });
       const hours = {
@@ -99,6 +100,7 @@ export class ReviewService {
         customerType: row.customer.customerType,
         assignee: row.assignee?.displayName ?? '',
         overdue: isQueueOverdue(row.status, row.statusChangedAt, hours, now),
+        dueAt: dueAtFor(row.status, row.statusChangedAt, hours),
       }));
       const counts = {
         requests: decorated.filter((row) => REQUEST_STATUSES.includes(row.status)).length,
@@ -111,7 +113,129 @@ export class ReviewService {
         view === 'dashboard'
           ? []
           : decorated.filter((row) => statuses!.includes(row.status));
-      return { tenantId, counts, items };
+      if (view !== 'dashboard') {
+        return { tenantId, counts, items };
+      }
+      const windowStart = now - windowDays * 24 * 60 * 60 * 1000;
+      const opened = decorated.filter((row) => row.createdAt.getTime() >= windowStart);
+      const distribution = distributionFor(opened);
+      const recent = [...opened].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 8);
+      const waitingPreview = decorated.filter((row) => WAITING_STATUSES.includes(row.status)).slice(0, 8);
+      const leadDays = policy?.expiryLeadDays ?? 30;
+      const lead = new Date(now + leadDays * 24 * 60 * 60 * 1000);
+      const expiring = await tx.document.findMany({
+        where: { tenantId, expiresOn: { lte: lead, not: null } },
+        select: {
+          id: true,
+          fieldKey: true,
+          expiresOn: true,
+          application: { select: { id: true, customer: { select: { legalName: true } } } },
+        },
+        orderBy: { expiresOn: 'asc' },
+        take: 8,
+      });
+      return {
+        tenantId,
+        windowDays,
+        counts: { ...counts, total: opened.length },
+        items,
+        distribution,
+        recent,
+        waitingPreview,
+        expiring: expiring.map((item) => ({
+          id: item.id,
+          applicationId: item.application.id,
+          legalName: item.application.customer.legalName,
+          document: item.fieldKey,
+          expiresOn: item.expiresOn,
+          status: item.expiresOn && item.expiresOn.getTime() < now ? 'expired' : 'due_soon',
+        })),
+      };
+    });
+  }
+
+  async dossier(auth: AuthState, applicationId: string, requestedTenantId?: string) {
+    const tenantId = this.targetTenant(auth, requestedTenantId);
+    await ensureFormCatalogue(this.prisma);
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const application = await tx.application.findFirst({
+        where: {
+          id: applicationId,
+          tenantId,
+          ...(auth.roles.includes('customer') ? { customer: { userId: auth.userId } } : {}),
+        },
+        include: {
+          customer: { select: { legalName: true, customerType: true } },
+          assignee: { select: { displayName: true } },
+          answers: { select: { fieldKey: true, value: true } },
+          documents: { select: { id: true, fieldKey: true, expiresOn: true, fileId: true } },
+          generatedPackages: {
+            select: { id: true, templateId: true, version: true, fileId: true, templateSha256: true, blocked: true },
+            orderBy: { version: 'desc' },
+          },
+          submissions: { select: { id: true, documentVersion: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
+        },
+      });
+      if (!application) {
+        throw new NotFoundException('Not found');
+      }
+      const fields = await tx.formField.findMany({
+        where: { schema: { version: application.schemaVersion } },
+        select: { fieldKey: true, label: true, sortOrder: true },
+        orderBy: { sortOrder: 'asc' },
+      });
+      const decisions = await tx.reviewDecision.findMany({
+        where: { tenantId, submission: { applicationId } },
+        select: {
+          id: true,
+          stage: true,
+          outcome: true,
+          reason: true,
+          documentVersion: true,
+          createdAt: true,
+          actor: { select: { displayName: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      const answers = new Map(application.answers.map((answer) => [answer.fieldKey, answer.value]));
+      const sections = ['kyc', 'ownership', 'pep', 'financial', 'documents', 'other'] as const;
+      const grouped = Object.fromEntries(sections.map((section) => [section, [] as { fieldKey: string; label: string; value: unknown }[]]));
+      for (const field of fields) {
+        const section = sectionFor(field.fieldKey);
+        grouped[section].push({
+          fieldKey: field.fieldKey,
+          label: field.label,
+          value: answers.has(field.fieldKey) ? answers.get(field.fieldKey) : null,
+        });
+      }
+      return {
+        id: application.id,
+        status: application.status,
+        documentVersion: application.documentVersion,
+        createdAt: application.createdAt,
+        statusChangedAt: application.statusChangedAt,
+        legalName: application.customer.legalName,
+        customerType: application.customer.customerType,
+        assignee: application.assignee?.displayName ?? '',
+        sections: grouped,
+        documents: application.documents.map((item) => ({
+          id: item.id,
+          fieldKey: item.fieldKey,
+          fileId: item.fileId,
+          expiresOn: item.expiresOn,
+        })),
+        packages: application.generatedPackages,
+        submissions: application.submissions,
+        decisions: decisions.map((decision) => ({
+          id: decision.id,
+          stage: decision.stage,
+          outcome: decision.outcome,
+          reason: decision.reason,
+          documentVersion: decision.documentVersion,
+          createdAt: decision.createdAt,
+          actor: decision.actor.displayName,
+        })),
+      };
     });
   }
 
@@ -363,6 +487,48 @@ export class ReviewService {
       throw new ConflictException('Segregation policy rejects this assignment');
     }
   }
+}
+
+function dueAtFor(
+  status: string,
+  changedAt: Date,
+  hours: { makerHours: number; checkerHours: number; approverHours: number },
+): string | null {
+  if (!['maker_review', 'checker_review', 'reassessment'].includes(status)) {
+    return null;
+  }
+  const limit = status === 'maker_review' ? hours.checkerHours : status === 'checker_review' ? hours.approverHours : hours.makerHours;
+  return new Date(changedAt.getTime() + limit * 60 * 60 * 1000).toISOString();
+}
+
+function distributionFor(rows: { status: string }[]): { status: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([status, count]) => ({ status, count }));
+}
+
+function sectionFor(fieldKey: string): 'kyc' | 'ownership' | 'pep' | 'financial' | 'documents' | 'other' {
+  if (fieldKey.includes('shareholder') || fieldKey.includes('ubo') || fieldKey.includes('management')) {
+    return 'ownership';
+  }
+  if (fieldKey.includes('pep') || fieldKey.includes('aml')) {
+    return 'pep';
+  }
+  if (fieldKey.includes('fund') || fieldKey.includes('wealth') || fieldKey.includes('bank') || fieldKey.startsWith('rspolicy')) {
+    return 'financial';
+  }
+  if (fieldKey.startsWith('kyc.docs')) {
+    return 'documents';
+  }
+  if (fieldKey.startsWith('pep')) {
+    return 'pep';
+  }
+  if (fieldKey.startsWith('kyc.')) {
+    return 'kyc';
+  }
+  return 'other';
 }
 
 function queueFilter(roles: string[]): { status?: { in: string[] } } {

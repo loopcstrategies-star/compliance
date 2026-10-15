@@ -12,11 +12,14 @@ export function homeForRoles(roles: string[]): string {
 }
 
 export const STAFF_TABS = [
-  { href: '/workspace/company', label: 'Company Profile', roles: ['super_admin'] },
-  { href: '/workspace/requests', label: 'New Request', roles: QUEUE_ROLES },
-  { href: '/workspace/waiting', label: 'Waiting List', roles: QUEUE_ROLES },
-  { href: '/workspace/customers', label: 'Customer List', roles: QUEUE_ROLES },
-  { href: '/workspace/dashboard', label: 'Dashboard', roles: QUEUE_ROLES },
+  { href: '/workspace/dashboard', label: 'Dashboard', roles: QUEUE_ROLES, group: 'main' },
+  { href: '/workspace/company', label: 'Company Profile', roles: ['super_admin'], group: 'main' },
+  { href: '/workspace/requests', label: 'New Request', roles: QUEUE_ROLES, group: 'main' },
+  { href: '/workspace/waiting', label: 'Waiting List', roles: QUEUE_ROLES, group: 'main' },
+  { href: '/workspace/customers', label: 'Customer List', roles: QUEUE_ROLES, group: 'main' },
+  { href: '/workspace/settings', label: 'Settings', roles: ['super_admin'], group: 'utility' },
+  { href: '/workspace/audit', label: 'Audit Logs', roles: ['super_admin'], group: 'utility' },
+  { href: '/workspace/help', label: 'Help', roles: QUEUE_ROLES, group: 'utility' },
 ] as const;
 
 export function tabsForRoles(roles: string[]) {

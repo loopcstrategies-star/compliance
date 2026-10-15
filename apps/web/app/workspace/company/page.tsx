@@ -6,8 +6,17 @@ import { SegregationForm } from '../../admin/segregation-form';
 import { OperationsForm } from '../../admin/operations-form';
 import { TenantAdminForm } from '../../admin/tenant-admin-form';
 import { CloneForm } from './clone-form';
+import { CompanyKycPanel } from './company-kyc';
 import { ProfileForm, type CompanyProfile } from './profile-form';
 
+type KycProfile = {
+  status: string;
+  reviewedAt: string | null;
+  updatedAt: string | null;
+  answers: { fieldKey: string; value: unknown }[];
+  evidence: { id: string; documentType: string; expiresOn: string | null }[];
+  grants: { id: string; recipientName: string; expiresAt: string; revokedAt: string | null }[];
+};
 type TemplateStatus = {
   templateId: string;
   letterheadOwner: string;
@@ -25,6 +34,7 @@ export default async function CompanyPage({ searchParams }: { searchParams: Prom
   const selected = companies.find((tenant) => tenant.id === query.tenant) ?? companies[0];
   const templates = (await apiGet<TemplateStatus[]>('/templates')) ?? [];
   const profile = selected ? await apiGet<CompanyProfile>(`/tenants/${selected.id}/profile`) : null;
+  const companyKyc = selected ? await apiGet<KycProfile>(`/tenants/${selected.id}/company-kyc`) : null;
 
   return (
     <>
@@ -41,7 +51,12 @@ export default async function CompanyPage({ searchParams }: { searchParams: Prom
         </p>
       ) : null}
       {profile ? <ProfileForm profile={profile} /> : selected ? <p className="notice error">The company profile could not be loaded.</p> : null}
-      {selected ? <CloneForm tenantId={selected.id} tenantName={selected.name} /> : null}
+      {selected && companyKyc ? <CompanyKycPanel tenantId={selected.id} profile={companyKyc} /> : null}
+      {selected ? (
+        <section id="copy">
+          <CloneForm tenantId={selected.id} tenantName={selected.name} />
+        </section>
+      ) : null}
       <section id="templates">
         <h2>Template readiness</h2>
         {templates.length === 0 ? <p className="notice error">Template status could not be loaded.</p> : null}

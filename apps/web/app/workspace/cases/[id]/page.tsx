@@ -2,14 +2,7 @@ import { notFound } from 'next/navigation';
 import { apiGet } from '../../../../lib/api';
 import { requireArea } from '../../../../lib/session';
 import { ReviewQueue, type ReviewCase } from '../../../compliance/review-queue';
-
-type Summary = ReviewCase & {
-  legalName: string;
-  customerType: string;
-  assignee: string;
-  createdAt: string;
-  statusChangedAt: string;
-};
+import { ReviewWorkspace, type Dossier } from './review-workspace';
 
 export default async function CasePage({
   params,
@@ -22,23 +15,20 @@ export default async function CasePage({
   const { id } = await params;
   const query = await searchParams;
   const tenant = query.tenant ? `?tenantId=${encodeURIComponent(query.tenant)}` : '';
-  const summary = await apiGet<Summary>(`/applications/${id}/summary${tenant}`);
-  if (!summary) {
+  const dossier = await apiGet<Dossier>(`/applications/${id}/dossier${tenant}`);
+  if (!dossier) {
     notFound();
   }
   const item: ReviewCase = {
-    id: summary.id,
-    status: summary.status,
-    documentVersion: summary.documentVersion,
-    customer: { legalName: summary.legalName, customerType: summary.customerType },
+    id: dossier.id,
+    status: dossier.status,
+    documentVersion: dossier.documentVersion,
+    customer: { legalName: dossier.legalName, customerType: dossier.customerType },
   };
   return (
     <>
-      <h2>{summary.legalName}</h2>
-      <p className="notice">
-        {summary.customerType.replaceAll('_', ' ')} · {summary.status.replaceAll('_', ' ')} · assignee {summary.assignee || 'unassigned'}
-      </p>
-      <ReviewQueue cases={[item]} roles={me.roles} />
+      <h2>{dossier.legalName}</h2>
+      <ReviewWorkspace dossier={dossier} review={<ReviewQueue cases={[item]} roles={me.roles} />} />
     </>
   );
 }

@@ -172,6 +172,43 @@ describe('administration and retention', () => {
     await platform.post(`/tenants/${tenantA.id}/clone`).send({ name: 'Unconfirmed', confirm: false }).expect(400);
   });
 
+  it('stores a company KYC profile outside the applicant queues', async () => {
+    const platform = await login('admin-a@example.com');
+    const before = await platform.get('/applications').query({ view: 'dashboard', tenantId: tenantA.id }).expect(200);
+    await platform
+      .put(`/tenants/${tenantA.id}/company-kyc`)
+      .send({ status: 'draft', answers: { 'kyc.entity.name': 'Admin Metals KYC' } })
+      .expect(200);
+    const after = await platform.get('/applications').query({ view: 'dashboard', tenantId: tenantA.id }).expect(200);
+    expect(after.body.counts.requests).toBe(before.body.counts.requests);
+    expect(after.body.counts.total).toBe(before.body.counts.total);
+    const loaded = await platform.get(`/tenants/${tenantA.id}/company-kyc`).expect(200);
+    expect(loaded.body.answers.some((answer: { value: string }) => answer.value === 'Admin Metals KYC')).toBe(true);
+    await platform
+      .post(`/tenants/${tenantA.id}/company-kyc/shares`)
+      .send({ confirm: false, recipientName: 'Other', recipientContact: 'other@example.com', fieldKeys: ['kyc.entity.name'] })
+      .expect(400);
+    const shared = await platform
+      .post(`/tenants/${tenantA.id}/company-kyc/shares`)
+      .send({
+        confirm: true,
+        recipientName: 'Other Co',
+        recipientContact: 'other@example.com',
+        fieldKeys: ['kyc.entity.name'],
+      })
+      .expect(201);
+    expect(shared.body.emailSent).toBe(false);
+    const token = new URL(`http://localhost${shared.body.acceptPath}`).searchParams.get('token');
+    const recipient = request.agent(app.getHttpServer());
+    await recipient.post('/company-kyc/accept').send({ token }).expect(201);
+    const pack = await recipient.get('/company-kyc/current').expect(200);
+    expect(JSON.stringify(pack.body)).toContain('Admin Metals KYC');
+    await platform.post(`/tenants/${tenantA.id}/company-kyc/shares/${shared.body.id}/revoke`).expect(201);
+    await recipient.post('/company-kyc/accept').send({ token }).expect(400);
+    const outsider = await login('customer-b-admin@example.com');
+    await outsider.get(`/tenants/${tenantA.id}/company-kyc`).expect(403);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });

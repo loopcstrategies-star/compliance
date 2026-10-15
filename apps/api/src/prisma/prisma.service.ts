@@ -54,14 +54,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return fn(tx);
     });
   }
+
+  async withGrantLookup<T>(tokenHash: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return this.$transaction(async (tx) => {
+      await applySettings(tx, { grantLookup: tokenHash });
+      return fn(tx);
+    });
+  }
 }
 
 async function applySettings(
   tx: Tx,
-  settings: { tenantId?: string; lookupEmail?: string; sessionLookup?: string; invitationLookup?: string },
+  settings: { tenantId?: string; lookupEmail?: string; sessionLookup?: string; invitationLookup?: string; grantLookup?: string },
 ): Promise<void> {
   await tx.$executeRaw`SELECT set_config('app.tenant_id', ${settings.tenantId ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config('app.lookup_email', ${settings.lookupEmail ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config('app.session_lookup', ${settings.sessionLookup ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config('app.invitation_lookup', ${settings.invitationLookup ?? ''}, true)`;
+  await tx.$executeRaw`SELECT set_config('app.grant_lookup', ${settings.grantLookup ?? ''}, true)`;
 }
