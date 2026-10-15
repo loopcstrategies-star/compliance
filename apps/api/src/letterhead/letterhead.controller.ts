@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FileService } from '../files/file.service';
 import { requireFile, UploadExceptionFilter, uploadOptions } from '../files/upload.filter';
 import { ensureTemplateCatalogue } from '../seed/template-catalogue';
+import { ensureFormCatalogue } from '../seed/form-catalogue';
 
 const templateSelect = {
   templateId: true,
@@ -28,7 +29,34 @@ export class LetterheadController {
   @RequirePermissions('letterhead.configure')
   async list() {
     await ensureTemplateCatalogue(this.prisma);
-    return this.prisma.templateVersion.findMany({ select: templateSelect, orderBy: { templateId: 'asc' } });
+    await ensureFormCatalogue(this.prisma);
+    const [templates, schemas] = await Promise.all([
+      this.prisma.templateVersion.findMany({
+        select: {
+          ...templateSelect,
+          placements: { select: { fieldKey: true, status: true } },
+        },
+        orderBy: { templateId: 'asc' },
+      }),
+      this.prisma.formSchema.findMany({
+        where: { version: 1 },
+        select: { templateId: true, _count: { select: { fields: true } } },
+      }),
+    ]);
+    const fieldsByTemplate = new Map(schemas.map((schema) => [schema.templateId, schema._count.fields]));
+    return templates.map((template) => {
+      const unresolvedPlacements = template.placements.filter((placement) => placement.status !== 'measured');
+      return {
+        templateId: template.templateId,
+        version: template.version,
+        pageCount: template.pageCount,
+        sha256: template.sha256,
+        letterheadOwner: template.letterheadOwner,
+        blockedFieldCount: fieldsByTemplate.get(template.templateId) ?? 0,
+        unresolvedPlacementCount: unresolvedPlacements.length,
+        blocked: (fieldsByTemplate.get(template.templateId) ?? 0) > 0 || unresolvedPlacements.length > 0,
+      };
+    });
   }
 
   @Patch('templates/:templateId')

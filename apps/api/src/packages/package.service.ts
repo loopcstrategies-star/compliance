@@ -100,7 +100,8 @@ export class PackageService {
       let bytes: Buffer = source;
       const placement = template.placements.find((item) => item.fieldKey.includes('letterhead'));
       const rect = asRect(placement?.rect ?? null);
-      if (template.letterheadOwner === 'customer') {
+      const companyApplicant = application.customer.customerType !== 'individual';
+      if (template.letterheadOwner === 'customer' && companyApplicant) {
         if (placement?.status === 'measured' && rect) {
           const letterhead = await tx.letterhead.findUnique({ where: { tenantId: auth.tenantId }, include: { file: true } });
           if (letterhead && write) {

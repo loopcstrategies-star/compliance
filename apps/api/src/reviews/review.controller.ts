@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { RequirePermissions } from '../auth/auth.decorator';
 import type { AuthedRequest } from '../auth/auth.guard';
 import { ReviewService } from './review.service';
@@ -9,8 +9,17 @@ export class ReviewController {
 
   @Get()
   @RequirePermissions('application.read')
-  list(@Req() req: AuthedRequest) {
+  list(@Query('view') view: string | undefined, @Query('tenantId') tenantId: string | undefined, @Req() req: AuthedRequest) {
+    if (view) {
+      return this.reviews.board(req.auth!, view, tenantId);
+    }
     return this.reviews.list(req.auth!);
+  }
+
+  @Get(':id/summary')
+  @RequirePermissions('application.read')
+  summary(@Param('id') id: string, @Query('tenantId') tenantId: string | undefined, @Req() req: AuthedRequest) {
+    return this.reviews.summary(req.auth!, id, tenantId);
   }
 
   @Post(':id/submit')

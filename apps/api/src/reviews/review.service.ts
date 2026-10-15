@@ -14,6 +14,27 @@ const STAGES = {
 
 type Stage = keyof typeof STAGES;
 const SUBMITTABLE = new Set(['draft', 'correction', 'reassessment']);
+const REQUEST_STATUSES = ['submitted'];
+const WAITING_STATUSES = ['maker_review', 'checker_review', 'correction', 'reassessment'];
+const CUSTOMER_STATUSES = ['approved'];
+const STATUSES_FOR: Record<string, string[]> = {
+  requests: REQUEST_STATUSES,
+  waiting: WAITING_STATUSES,
+  customers: CUSTOMER_STATUSES,
+};
+
+function isQueueOverdue(
+  status: string,
+  changedAt: Date,
+  hours: { makerHours: number; checkerHours: number; approverHours: number },
+  now: number,
+): boolean {
+  if (!['maker_review', 'checker_review', 'reassessment'].includes(status)) {
+    return false;
+  }
+  const limit = status === 'maker_review' ? hours.checkerHours : status === 'checker_review' ? hours.approverHours : hours.makerHours;
+  return changedAt.getTime() + limit * 60 * 60 * 1000 < now;
+}
 
 @Injectable()
 export class ReviewService {
@@ -36,6 +57,107 @@ export class ReviewService {
         orderBy: { createdAt: 'asc' },
       }),
     );
+  }
+
+  async board(auth: AuthState, view: string, requestedTenantId?: string) {
+    const tenantId = this.targetTenant(auth, requestedTenantId);
+    const statuses = STATUSES_FOR[view];
+    if (!statuses && view !== 'dashboard') {
+      throw new BadRequestException('Queue is invalid');
+    }
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const policy = await tx.operationsPolicy.findUnique({ where: { tenantId } });
+      const hours = {
+        makerHours: policy?.makerHours ?? 48,
+        checkerHours: policy?.checkerHours ?? 48,
+        approverHours: policy?.approverHours ?? 48,
+      };
+      const rows = await tx.application.findMany({
+        where: {
+          tenantId,
+          ...(auth.roles.includes('customer') ? { customer: { userId: auth.userId } } : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          documentVersion: true,
+          createdAt: true,
+          statusChangedAt: true,
+          assignee: { select: { displayName: true } },
+          customer: { select: { legalName: true, customerType: true } },
+        },
+        orderBy: { statusChangedAt: 'asc' },
+      });
+      const now = Date.now();
+      const decorated = rows.map((row) => ({
+        id: row.id,
+        status: row.status,
+        documentVersion: row.documentVersion,
+        createdAt: row.createdAt,
+        statusChangedAt: row.statusChangedAt,
+        legalName: row.customer.legalName,
+        customerType: row.customer.customerType,
+        assignee: row.assignee?.displayName ?? '',
+        overdue: isQueueOverdue(row.status, row.statusChangedAt, hours, now),
+      }));
+      const counts = {
+        requests: decorated.filter((row) => REQUEST_STATUSES.includes(row.status)).length,
+        waiting: decorated.filter((row) => WAITING_STATUSES.includes(row.status)).length,
+        corrections: decorated.filter((row) => row.status === 'correction').length,
+        customers: decorated.filter((row) => CUSTOMER_STATUSES.includes(row.status)).length,
+        overdue: decorated.filter((row) => row.overdue).length,
+      };
+      const items =
+        view === 'dashboard'
+          ? []
+          : decorated.filter((row) => statuses!.includes(row.status));
+      return { tenantId, counts, items };
+    });
+  }
+
+  async summary(auth: AuthState, applicationId: string, requestedTenantId?: string) {
+    const tenantId = this.targetTenant(auth, requestedTenantId);
+    const row = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.application.findFirst({
+        where: {
+          id: applicationId,
+          tenantId,
+          ...(auth.roles.includes('customer') ? { customer: { userId: auth.userId } } : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          documentVersion: true,
+          createdAt: true,
+          statusChangedAt: true,
+          assignee: { select: { displayName: true } },
+          customer: { select: { legalName: true, customerType: true } },
+        },
+      }),
+    );
+    if (!row) {
+      throw new NotFoundException('Not found');
+    }
+    return {
+      id: row.id,
+      status: row.status,
+      documentVersion: row.documentVersion,
+      createdAt: row.createdAt,
+      statusChangedAt: row.statusChangedAt,
+      legalName: row.customer.legalName,
+      customerType: row.customer.customerType,
+      assignee: row.assignee?.displayName ?? '',
+    };
+  }
+
+  private targetTenant(auth: AuthState, requestedTenantId?: string): string {
+    if (!requestedTenantId || requestedTenantId === auth.tenantId) {
+      return auth.tenantId;
+    }
+    if (!auth.permissions.includes('tenant.manage')) {
+      throw new ForbiddenException('Permission denied');
+    }
+    return requestedTenantId;
   }
 
   async submit(auth: AuthState, applicationId: string) {

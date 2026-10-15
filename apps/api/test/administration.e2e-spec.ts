@@ -155,6 +155,23 @@ describe('administration and retention', () => {
     expect(again.body.find((item: { id: string }) => item.id === old.id).quarantined).toBe(false);
   });
 
+  it('copies configuration onto a new tenant without applications or users', async () => {
+    const platform = await login('admin-a@example.com');
+    await platform.put(`/tenants/${tenantA.id}/profile`).send({ displayName: 'Admin Metals', country: 'AE' }).expect(200);
+    const cloned = await platform
+      .post(`/tenants/${tenantA.id}/clone`)
+      .send({ name: 'Copied Metals', confirm: true, copyProfile: true, copyApplicability: true })
+      .expect(201);
+    expect(cloned.body.isSystem).toBe(false);
+    expect(cloned.body.applications).toBe(0);
+    expect(cloned.body.users).toBe(0);
+    expect(cloned.body.files).toBe(0);
+    const profile = await platform.get(`/tenants/${cloned.body.id}/profile`).expect(200);
+    expect(profile.body.displayName).toBe('Admin Metals');
+    expect(profile.body.country).toBe('AE');
+    await platform.post(`/tenants/${tenantA.id}/clone`).send({ name: 'Unconfirmed', confirm: false }).expect(400);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });

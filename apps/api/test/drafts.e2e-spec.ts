@@ -178,6 +178,23 @@ describe('drafts and invitations', () => {
     expect(foreignDraft.body.extras).toEqual([]);
   });
 
+  it('opens an invitation from the link and issues a fresh resume link', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'link@example.com', legalName: 'Link Metals', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token }).expect(201);
+    await request(app.getHttpServer()).post('/invitations/accept').send({ token }).expect(400);
+    const resumed = await employee.post('/invitations/resume').send({ email: 'link@example.com' }).expect(201);
+    const next = new URL(`http://localhost${resumed.body.acceptPath}`).searchParams.get('token');
+    expect(next).toBeTruthy();
+    expect(next).not.toBe(token);
+    expect(JSON.stringify(resumed.body)).not.toContain('sent');
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });
