@@ -24,6 +24,15 @@ export class InvitationController {
     });
   }
 
+  @Post('resume')
+  @RequirePermissions('invitation.create')
+  resume(@Body() body: { email?: string }, @Req() req: AuthedRequest) {
+    if (typeof body?.email !== 'string') {
+      throw new BadRequestException('Email is required');
+    }
+    return this.invitations.resume(req.auth!, body.email);
+  }
+
   @Post(':id/revoke')
   @RequirePermissions('invitation.create')
   async revoke(@Param('id') id: string, @Req() req: AuthedRequest) {

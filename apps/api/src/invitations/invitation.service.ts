@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,7 @@ const INVALID = 'Invitation is not valid';
 @Injectable()
 export class InvitationService {
   private readonly logger = new Logger(InvitationService.name);
+  private readonly resumeAttempts = new Map<string, number[]>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -57,12 +58,42 @@ export class InvitationService {
     }
   }
 
+  async resume(auth: AuthState, email: string) {
+    const normalised = email.trim().toLowerCase();
+    if (!normalised) {
+      throw new BadRequestException('Email is required');
+    }
+    const key = `${auth.tenantId}:${normalised}`;
+    const now = Date.now();
+    const recent = (this.resumeAttempts.get(key) ?? []).filter((stamp) => now - stamp < 60_000);
+    if (recent.length >= 3) {
+      throw new HttpException('Too many requests', 429);
+    }
+    recent.push(now);
+    this.resumeAttempts.set(key, recent);
+    const prior = await this.prisma.withTenant(auth.tenantId, (tx) =>
+      tx.invitation.findFirst({
+        where: { tenantId: auth.tenantId, email: normalised },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+    if (!prior) {
+      throw new NotFoundException('Invitation is not valid');
+    }
+    return this.create(auth, {
+      email: prior.email,
+      legalName: prior.legalName,
+      customerType: prior.customerType,
+    });
+  }
+
   async accept(
     current: AuthState | null,
     input: { token?: string; password?: string; displayName?: string },
     res: Response,
   ) {
-    if (typeof input.token !== 'string' || typeof input.password !== 'string' || input.password.length < 10) {
+    const password = typeof input.password === 'string' ? input.password : '';
+    if (typeof input.token !== 'string' || (password.length > 0 && password.length < 10)) {
       throw new BadRequestException(INVALID);
     }
     const invitation = await this.prisma.withInvitationLookup(hashToken(input.token), (tx) =>
@@ -75,7 +106,7 @@ export class InvitationService {
       throw new ForbiddenException('Tenant mismatch');
     }
     const displayName = input.displayName?.trim() || invitation.legalName;
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPassword(password || randomBytes(32).toString('base64url'));
     const role = await this.prisma.role.findUniqueOrThrow({ where: { key: 'customer' } });
     const user = await this.prisma.withTenant(invitation.tenantId, async (tx) => {
       const created = await tx.user.create({

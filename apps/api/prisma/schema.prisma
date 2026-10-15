@@ -8,10 +8,18 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  isSystem  Boolean  @default(false) @map("is_system")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String
+  isSystem           Boolean  @default(false) @map("is_system")
+  displayName        String   @default("") @map("display_name")
+  registrationId     String   @default("") @map("registration_id")
+  registeredAddress  String   @default("") @map("registered_address")
+  operatingAddress   String   @default("") @map("operating_address")
+  country            String   @default("")
+  phone              String   @default("")
+  website            String   @default("")
+  complianceEmail    String   @default("") @map("compliance_email")
+  createdAt          DateTime @default(now()) @map("created_at")
   users        User[]
   customers    Customer[]
   invitations  Invitation[]
