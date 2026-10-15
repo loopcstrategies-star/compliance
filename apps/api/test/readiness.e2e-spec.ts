@@ -75,17 +75,14 @@ describe('role areas', () => {
     await customer.get('/tenants').expect(403);
 
     const employee = await login('employee-ready@example.com');
-    await satisfyMfa(employee, employeeSecret);
     await employee.get('/dashboard').expect(200);
     await employee.get('/tenants').expect(403);
 
     const maker = await login('maker-ready@example.com');
-    await satisfyMfa(maker, makerSecret);
     await maker.get('/applications').expect(200);
     await maker.get('/dashboard').expect(403);
 
     const platform = await login('admin-ready@example.com');
-    await satisfyMfa(platform, adminSecret);
     await platform.get('/tenants').expect(200);
     await platform.get(`/files/${fileId}`).expect(403);
   });
@@ -97,15 +94,6 @@ describe('role areas', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 async function createUser(

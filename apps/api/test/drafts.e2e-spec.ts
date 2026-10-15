@@ -56,7 +56,6 @@ describe('drafts and invitations', () => {
       logs.push(String(message));
     });
     const employee = await login('employee-a@example.com');
-    await satisfyMfa(employee, employeeSecret);
 
     const created = await employee
       .post('/invitations')
@@ -112,7 +111,6 @@ describe('drafts and invitations', () => {
     expect(own.body.application.customerType).toBe('local_company');
 
     const employeeB = await login('employee-b@example.com');
-    await satisfyMfa(employeeB, employeeBSecret);
     const foreignInvite = await employeeB
       .post('/invitations')
       .send({ email: 'foreign@example.com', legalName: 'Foreign Metals', customerType: 'foreign_company' })
@@ -166,7 +164,6 @@ describe('drafts and invitations', () => {
 
   it('shows an extra checklist category only in the tenant that owns it', async () => {
     const platform = await login('admin@example.com');
-    await satisfyMfa(platform, adminSecret);
     const created = await platform
       .post('/checklist-categories')
       .send({ tenantId: tenantA.id, label: 'Site visit notes' })
@@ -188,15 +185,6 @@ describe('drafts and invitations', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 
 });
 

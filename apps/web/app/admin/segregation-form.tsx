@@ -40,6 +40,11 @@ export function SegregationForm({ tenants }: { tenants: { id: string; name: stri
   return (
     <form onSubmit={onSubmit}>
       <h2>Segregation of duties</h2>
+      <p>
+        When a switch is on, a different person must perform that next stage. When it is off, the same authorised
+        person may perform both stages. Each decision still records the actor, time, outcome, and comment. Saving
+        here changes only the selected tenant.
+      </p>
       <label>
         Tenant
         <select name="tenantId" required defaultValue={tenants[0]?.id ?? ''}>

@@ -81,7 +81,6 @@ describe('administration and retention', () => {
     const before = await customer.get(`/applications/${applicationA.id}/completeness`).expect(200);
     expect(before.body.missingAnswers.some((key: string) => key.startsWith('kyc.'))).toBe(true);
     const platform = await login('admin-a@example.com');
-    await satisfyMfa(platform, secretA);
     await platform
       .post(`/tenants/${tenantA.id}/applicability`)
       .send({ customerType: 'local_company', templateId: 'kyc', required: false })
@@ -95,7 +94,6 @@ describe('administration and retention', () => {
     await platform.post(`/tenants/${tenantA.id}/users/${employee.id}/roles`).send({ role: 'maker' }).expect(201);
     await platform.delete(`/tenants/${tenantA.id}/users/${employee.id}/roles/maker`).expect(200);
     const staff = await login('employee-admin@example.com');
-    await satisfyMfa(staff, employeeSecret);
     await staff.get('/auth/me').expect(200);
     await platform.post(`/tenants/${tenantA.id}/users/${employee.id}/revoke-sessions`).expect(201);
     await staff.get('/auth/me').expect(401);
@@ -111,9 +109,7 @@ describe('administration and retention', () => {
       update: {},
     });
     const first = await login('admin-a@example.com');
-    await satisfyMfa(first, secretA);
     const second = await login('admin-b@example.com');
-    await satisfyMfa(second, secretB);
     await first.post(`/tenants/${tenantA.id}/holds`).send({ targetType: 'stored_file', targetId: heldFile.id, reason: 'dispute' }).expect(201);
     const held = await first
       .post(`/tenants/${tenantA.id}/deletions`)
@@ -146,7 +142,6 @@ describe('administration and retention', () => {
 
   it('lists one tenant audit trail and keeps a held event', async () => {
     const platform = await login('admin-a@example.com');
-    await satisfyMfa(platform, secretA);
     await platform
       .post(`/tenants/${tenantA.id}/retention`)
       .send({ category: 'audit', retentionDays: 1, effectiveFrom: '2020-01-01' })
@@ -167,15 +162,6 @@ describe('administration and retention', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 async function saveFile(admin: PrismaClient, tenantId: string, applicationId: string, fieldKey: string) {

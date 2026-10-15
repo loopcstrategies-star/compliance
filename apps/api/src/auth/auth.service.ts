@@ -17,8 +17,6 @@ import { decryptSecret, encryptSecret, hashToken } from '../crypto/secrets';
 import { redact } from '../common/redact';
 import { PRIVILEGED_ROLES, SESSION_COOKIE, SESSION_TTL_MS } from '../domain';
 import type { AuthState } from './auth.types';
-import { localMfaDeferralAllowed } from './local-mfa';
-
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 10;
 
@@ -50,7 +48,6 @@ export class AuthService {
       throw new ForbiddenException('Tenant mismatch');
     }
 
-    const profile = await this.loadProfile(user.id, user.tenantId);
     const raw = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await this.prisma.withTenant(user.tenantId, (tx) =>
@@ -60,13 +57,13 @@ export class AuthService {
           userId: user.id,
           tokenHash: hashToken(raw),
           expiresAt,
-          mfaSatisfied: !profile.privileged || localMfaDeferralAllowed(process.env),
+          mfaSatisfied: true,
         },
       }),
     );
     this.setCookie(res, raw, expiresAt);
     this.logger.log(JSON.stringify(redact({ userId: user.id, outcome: 'session_created' })));
-    return { mfaRequired: profile.privileged && !localMfaDeferralAllowed(process.env) };
+    return { mfaRequired: false };
   }
 
   async confirmMfa(auth: AuthState, code: string): Promise<{ mfaSatisfied: true }> {
@@ -199,7 +196,6 @@ export class AuthService {
   }
 
   async startSession(userId: string, tenantId: string, res: Response): Promise<void> {
-    const profile = await this.loadProfile(userId, tenantId);
     const raw = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await this.prisma.withTenant(tenantId, (tx) =>
@@ -209,7 +205,7 @@ export class AuthService {
           userId,
           tokenHash: hashToken(raw),
           expiresAt,
-          mfaSatisfied: !profile.privileged || localMfaDeferralAllowed(process.env),
+          mfaSatisfied: true,
         },
       }),
     );

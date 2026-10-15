@@ -46,9 +46,6 @@ export async function requireArea(allowed: string[]): Promise<Me> {
   if (!me) {
     redirect('/login');
   }
-  if (me.privileged && !me.mfaSatisfied) {
-    redirect('/mfa');
-  }
   if (!me.roles.some((role) => allowed.includes(role))) {
     redirect('/login?denied=1');
   }

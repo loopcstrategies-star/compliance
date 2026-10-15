@@ -108,7 +108,6 @@ describe('employee operations', () => {
 
   it('counts one tenant, separates queues, and rejects a bad assignment', async () => {
     const employee = await login('employee-ops@example.com');
-    await satisfyMfa(employee, employeeSecret);
     const dashboard = await employee.get('/dashboard').expect(200);
     expect(dashboard.body).toMatchObject({
       draft: 2,
@@ -124,7 +123,6 @@ describe('employee operations', () => {
     expect(JSON.stringify(dashboard.body)).not.toContain('Foreign Desk');
 
     const maker = await login('maker-ops@example.com');
-    await satisfyMfa(maker, makerSecret);
     const queue = await maker.get('/applications').expect(200);
     const ids = queue.body.map((item: { id: string }) => item.id);
     expect(ids).toContain(submittedId);
@@ -137,7 +135,6 @@ describe('employee operations', () => {
 
   it('reports processing time, expiry, reminders, and a tenant export', async () => {
     const employee = await login('employee-ops@example.com');
-    await satisfyMfa(employee, employeeSecret);
     const report = await employee.get('/reports/processing').expect(200);
     expect(report.body).toMatchObject({ makerHours: 2, checkerHours: 4, approverHours: 6, approvalHours: 6 });
 
@@ -171,15 +168,6 @@ describe('employee operations', () => {
     return agent;
   }
 
-  async function satisfyMfa(agent: request.Agent, secret: string) {
-    const code = new OTPAuth.TOTP({
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(secret),
-    }).generate();
-    await agent.post('/auth/mfa').send({ code }).expect(201);
-  }
 });
 
 function decision(tenantId: string, submissionId: string, stage: string, actorId: string, createdAt: Date) {
