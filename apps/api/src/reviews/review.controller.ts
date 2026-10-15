@@ -9,11 +9,22 @@ export class ReviewController {
 
   @Get()
   @RequirePermissions('application.read')
-  list(@Query('view') view: string | undefined, @Query('tenantId') tenantId: string | undefined, @Req() req: AuthedRequest) {
+  board(
+    @Query('view') view: string | undefined,
+    @Query('tenantId') tenantId: string | undefined,
+    @Query('days') days: string | undefined,
+    @Req() req: AuthedRequest,
+  ) {
     if (view) {
-      return this.reviews.board(req.auth!, view, tenantId);
+      return this.reviews.board(req.auth!, view, tenantId, days);
     }
     return this.reviews.list(req.auth!);
+  }
+
+  @Get(':id/dossier')
+  @RequirePermissions('application.read')
+  dossier(@Param('id') id: string, @Query('tenantId') tenantId: string | undefined, @Req() req: AuthedRequest) {
+    return this.reviews.dossier(req.auth!, id, tenantId);
   }
 
   @Get(':id/summary')
