@@ -20,22 +20,24 @@ export class InvitationService {
     private readonly auth: AuthService,
   ) {}
 
-  async create(auth: AuthState, input: { email: string; legalName: string; customerType: string }) {
+  async create(auth: AuthState, input: { email: string; legalName: string; customerType: string; tenantId?: string }) {
     const email = input.email.trim().toLowerCase();
     const legalName = input.legalName.trim();
     if (!email || !legalName || !isCustomerType(input.customerType)) {
       throw new BadRequestException('Email, legal name, and customer type are required');
     }
+    const tenantId = await this.targetTenant(auth, input.tenantId);
     const raw = randomBytes(32).toString('base64url');
-    const invitation = await this.prisma.withTenant(auth.tenantId, (tx) =>
+    const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
+    const invitation = await this.prisma.withTenant(tenantId, (tx) =>
       tx.invitation.create({
         data: {
-          tenantId: auth.tenantId,
+          tenantId,
           email,
           legalName,
           customerType: input.customerType,
           tokenHash: hashToken(raw),
-          expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+          expiresAt,
         },
       }),
     );
@@ -43,6 +45,8 @@ export class InvitationService {
     return {
       id: invitation.id,
       acceptPath: `/accept?token=${encodeURIComponent(raw)}`,
+      expiresAt: invitation.expiresAt,
+      emailSent: false,
     };
   }
 
@@ -58,12 +62,13 @@ export class InvitationService {
     }
   }
 
-  async resume(auth: AuthState, email: string) {
+  async resume(auth: AuthState, email: string, tenantId?: string) {
     const normalised = email.trim().toLowerCase();
     if (!normalised) {
       throw new BadRequestException('Email is required');
     }
-    const key = `${auth.tenantId}:${normalised}`;
+    const target = await this.targetTenant(auth, tenantId);
+    const key = `${target}:${normalised}`;
     const now = Date.now();
     const recent = (this.resumeAttempts.get(key) ?? []).filter((stamp) => now - stamp < 60_000);
     if (recent.length >= 3) {
@@ -71,9 +76,9 @@ export class InvitationService {
     }
     recent.push(now);
     this.resumeAttempts.set(key, recent);
-    const prior = await this.prisma.withTenant(auth.tenantId, (tx) =>
+    const prior = await this.prisma.withTenant(target, (tx) =>
       tx.invitation.findFirst({
-        where: { tenantId: auth.tenantId, email: normalised },
+        where: { tenantId: target, email: normalised },
         orderBy: { createdAt: 'desc' },
       }),
     );
@@ -84,7 +89,24 @@ export class InvitationService {
       email: prior.email,
       legalName: prior.legalName,
       customerType: prior.customerType,
+      tenantId: target,
     });
+  }
+
+  private async targetTenant(auth: AuthState, requested?: string) {
+    const requestedId = requested?.trim() ?? '';
+    if (requestedId && requestedId !== auth.tenantId && !auth.permissions.includes('tenant.manage')) {
+      throw new ForbiddenException('Permission denied');
+    }
+    const tenantId = requestedId || auth.tenantId;
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, isSystem: true } });
+    if (!tenant || tenant.isSystem) {
+      throw new BadRequestException('Select an onboarding company');
+    }
+    if (tenant.id !== auth.tenantId && !auth.permissions.includes('tenant.manage')) {
+      throw new ForbiddenException('Permission denied');
+    }
+    return tenant.id;
   }
 
   async accept(
