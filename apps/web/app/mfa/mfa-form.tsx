@@ -3,14 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
-
-const HOME: Record<string, string> = {
-  employee: '/employee',
-  maker: '/compliance',
-  checker: '/compliance',
-  authorised_approver: '/compliance',
-  super_admin: '/admin',
-};
+import { homeForRoles } from '../../lib/home';
 
 export function MfaForm() {
   const router = useRouter();
@@ -88,7 +81,7 @@ export function MfaForm() {
       return;
     }
     const me = await meResponse.json();
-    router.push(HOME[me.roles[0]] ?? '/login');
+    router.push(homeForRoles(me.roles ?? []));
     router.refresh();
   }
 

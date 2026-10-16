@@ -146,7 +146,11 @@ describe('maker checker workflow', () => {
     const current = await customer.get(`/applications/${applicationA.id}`).expect(200);
     const resubmitted = await customer.post(`/applications/${applicationA.id}/submit`).expect(201);
     const version = resubmitted.body.documentVersion as number;
+    expect(resubmitted.body.status).toBe('reassessment');
+    expect(version).toBe(current.body.application.documentVersion + 1);
     const maker = await login('maker-review@example.com');
+    const waiting = await maker.get('/applications?view=waiting').expect(200);
+    expect(waiting.body.items.some((row: { id: string; status: string }) => row.id === applicationA.id && row.status === 'reassessment')).toBe(true);
     const checker = await login('checker-review@example.com');
     const approver = await login('approver-review@example.com');
     expect(current.body.application.status).toBe('correction');

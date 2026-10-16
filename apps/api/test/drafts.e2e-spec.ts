@@ -193,6 +193,10 @@ describe('drafts and invitations', () => {
     expect(next).toBeTruthy();
     expect(next).not.toBe(token);
     expect(JSON.stringify(resumed.body)).not.toContain('sent');
+    const resumedCustomer = request.agent(app.getHttpServer());
+    await resumedCustomer.post('/invitations/accept').send({ token: next }).expect(201);
+    expect(await admin.user.count({ where: { email: 'link@example.com' } })).toBe(1);
+    await resumedCustomer.get('/applications/current').expect(200);
   });
 
   async function login(email: string) {

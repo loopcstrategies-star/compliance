@@ -7,13 +7,13 @@ import { isTemplateRequired } from '../documents/applicability';
 import { ensureFormCatalogue } from '../seed/form-catalogue';
 
 const STAGES = {
-  maker: { from: 'submitted', to: 'maker_review', permission: 'review.maker' },
-  checker: { from: 'maker_review', to: 'checker_review', permission: 'review.checker' },
-  authorised_approver: { from: 'checker_review', to: 'approved', permission: 'review.approve' },
+  maker: { from: ['submitted', 'reassessment'], to: 'maker_review', permission: 'review.maker' },
+  checker: { from: ['maker_review'], to: 'checker_review', permission: 'review.checker' },
+  authorised_approver: { from: ['checker_review'], to: 'approved', permission: 'review.approve' },
 } as const;
 
 type Stage = keyof typeof STAGES;
-const SUBMITTABLE = new Set(['draft', 'correction', 'reassessment']);
+const SUBMITTABLE = new Set(['draft', 'correction']);
 const REQUEST_STATUSES = ['submitted'];
 const WAITING_STATUSES = ['maker_review', 'checker_review', 'correction', 'reassessment'];
 const CUSTOMER_STATUSES = ['approved'];
@@ -300,18 +300,23 @@ export class ReviewService {
           latest.set(item.templateId, item.id);
         }
       }
+      const correcting = application.status === 'correction';
+      const updated = await tx.application.update({
+        where: { id: applicationId },
+        data: {
+          status: correcting ? 'reassessment' : 'submitted',
+          statusChangedAt: new Date(),
+          ...(correcting ? { documentVersion: { increment: 1 } } : {}),
+        },
+        select: { id: true, status: true, documentVersion: true },
+      });
       const submission = await tx.submission.create({
         data: {
           tenantId: auth.tenantId,
           applicationId,
-          documentVersion: application.documentVersion,
+          documentVersion: updated.documentVersion,
           packageIds: [...latest.values()],
         },
-      });
-      const updated = await tx.application.update({
-        where: { id: applicationId },
-        data: { status: 'submitted', statusChangedAt: new Date() },
-        select: { id: true, status: true, documentVersion: true },
       });
       return { ...updated, submissionId: submission.id };
     });
@@ -354,7 +359,7 @@ export class ReviewService {
       ) {
         throw new ConflictException('Document version is stale');
       }
-      if (application.status !== rule.from) {
+      if (!(rule.from as readonly string[]).includes(application.status)) {
         throw new BadRequestException('This stage is not open');
       }
       await this.assertSegregation(tx, auth.tenantId, submission.id, stage, auth.userId);

@@ -5,6 +5,8 @@ import type { AuthState } from '../auth/auth.types';
 import { redact } from '../common/redact';
 import { assertUpload, readPrivateFile, writePrivateFile, type AllowedKind } from './storage';
 
+const IDENTITY_DOCUMENT_KEYS = new Set(['kyc.docs.8', 'kyc.docs.9', 'kyc.docs.10', 'kyc.docs.11']);
+
 @Injectable()
 export class FileService {
   private readonly logger = new Logger(FileService.name);
@@ -59,27 +61,42 @@ export class FileService {
       this.logger.log(JSON.stringify(redact({ fileId: file.id, outcome: 'downloaded' })));
       return this.payload(file);
     }
-    if (!auth.permissions.includes('identity_file.read')) {
+    const canReadCase = auth.permissions.includes('document.read');
+    const canReadIdentity = auth.permissions.includes('identity_file.read');
+    if (!canReadCase && !canReadIdentity) {
       throw new ForbiddenException();
     }
-    if (!purpose?.trim()) {
-      throw new BadRequestException('Purpose is required');
-    }
     const file = await this.loadClean(auth.tenantId, fileId);
-    await this.prisma.withTenant(auth.tenantId, (tx) =>
-      tx.auditEvent.create({
-        data: {
-          tenantId: auth.tenantId,
-          actorId: auth.userId,
-          action: 'identity_file.access',
-          targetType: 'stored_file',
-          targetId: file.id,
-          purpose: purpose.trim(),
-        },
-      }),
-    );
+    const identity = await this.prisma.withTenant(auth.tenantId, (tx) => this.isIdentityEvidence(tx, fileId));
+    if (identity) {
+      if (!auth.permissions.includes('identity_file.read')) {
+        throw new ForbiddenException();
+      }
+      if (!purpose?.trim()) {
+        throw new BadRequestException('Purpose is required');
+      }
+      await this.prisma.withTenant(auth.tenantId, (tx) =>
+        tx.auditEvent.create({
+          data: {
+            tenantId: auth.tenantId,
+            actorId: auth.userId,
+            action: 'identity_file.access',
+            targetType: 'stored_file',
+            targetId: file.id,
+            purpose: purpose.trim(),
+          },
+        }),
+      );
+    } else if (!auth.permissions.includes('document.read')) {
+      throw new ForbiddenException();
+    }
     this.logger.log(JSON.stringify(redact({ fileId: file.id, outcome: 'downloaded' })));
     return this.payload(file);
+  }
+
+  private async isIdentityEvidence(tx: Tx, fileId: string) {
+    const documents = await tx.document.findMany({ where: { fileId }, select: { fieldKey: true } });
+    return documents.some((item) => IDENTITY_DOCUMENT_KEYS.has(item.fieldKey));
   }
 
   private async loadClean(tenantId: string, fileId: string) {

@@ -129,11 +129,17 @@ describe('packages and uploads', () => {
     await platform.get(`/files/${fileId}`).expect(403);
 
     const reader = await login('reader-a@example.com');
-    await reader.get(`/files/${fileId}`).expect(400);
-    const allowed = await reader.get(`/files/${fileId}?purpose=case-review`).expect(200);
+    await reader.get(`/files/${fileId}?purpose=case-review`).expect(403);
+    const passport = await local
+      .post(`/applications/${applicationA.id}/documents`)
+      .field('fieldKey', 'kyc.docs.8')
+      .attach('file', Buffer.from(`%PDF-1.4\n%${MARKER}\n%%EOF`), 'passport.pdf')
+      .expect(201);
+    await reader.get(`/files/${passport.body.fileId}`).expect(400);
+    const allowed = await reader.get(`/files/${passport.body.fileId}?purpose=case-review`).expect(200);
     expect(allowed.body.includes(MARKER)).toBe(true);
     const audit = await admin.auditEvent.findFirst({
-      where: { action: 'identity_file.access', targetId: fileId },
+      where: { action: 'identity_file.access', targetId: passport.body.fileId },
       orderBy: { createdAt: 'desc' },
     });
     expect(audit?.purpose).toBe('case-review');
