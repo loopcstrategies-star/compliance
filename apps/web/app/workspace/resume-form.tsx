@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { staffFailure } from '../../lib/staff-error';
 
 export function ResumeForm({ companies = [] }: { companies?: { id: string; name: string }[] }) {
   const [message, setMessage] = useState('');
@@ -18,7 +19,7 @@ export function ResumeForm({ companies = [] }: { companies?: { id: string; name:
       body: JSON.stringify({ email: form.get('email'), ...(tenantId ? { tenantId } : {}) }),
     });
     if (!response.ok) {
-      setError(response.status === 429 ? 'Wait a minute before issuing another link.' : 'A new link was not issued.');
+      setError(await staffFailure(response, 'The invitation was not created.'));
       return;
     }
     const body = (await response.json()) as { acceptPath: string; expiresAt: string };

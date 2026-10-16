@@ -3,6 +3,7 @@ import { PrismaService, type Tx } from '../prisma/prisma.service';
 import type { AuthState } from '../auth/auth.types';
 import { CUSTOMER_TYPES, STAFF_ROLES } from '../domain';
 import { removePrivateFile } from '../files/storage';
+import { assertUniqueTenantName, duplicateNameError } from '../tenants/tenant-name';
 
 const TEMPLATES = ['kyc', 'pep-declaration', 'pep-questionnaire', 'responsible-sourcing'];
 const CATEGORIES = ['application', 'document', 'audit'];
@@ -12,16 +13,21 @@ const DAY = 24 * 60 * 60 * 1000;
 export class AdministrationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  renameTenant(id: string, name: string) {
+  async renameTenant(id: string, name: string) {
     const trimmed = name.trim();
     if (!trimmed) {
       throw new BadRequestException('Name is required');
     }
-    return this.prisma.tenant.update({
-      where: { id },
-      data: { name: trimmed },
-      select: { id: true, name: true, isSystem: true },
-    });
+    await assertUniqueTenantName(this.prisma, trimmed, id);
+    try {
+      return await this.prisma.tenant.update({
+        where: { id },
+        data: { name: trimmed },
+        select: { id: true, name: true, isSystem: true },
+      });
+    } catch (error) {
+      throw duplicateNameError(error);
+    }
   }
 
   setApplicability(tenantId: string, customerType: string, templateId: string, required: boolean) {

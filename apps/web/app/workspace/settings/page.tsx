@@ -2,6 +2,7 @@ import { requireArea } from '../../../lib/session';
 import { SegregationForm } from '../../admin/segregation-form';
 import { OperationsForm } from '../../admin/operations-form';
 import { TenantAdminForm } from '../../admin/tenant-admin-form';
+import { CreateCompanyForm } from '../company/create-company-form';
 import { apiGet } from '../../../lib/api';
 
 export default async function SettingsPage() {
@@ -12,6 +13,7 @@ export default async function SettingsPage() {
     <>
       <h2>Settings</h2>
       <p className="notice">Segregation, operations, staff, and retention stay on the existing controls.</p>
+      <CreateCompanyForm />
       <SegregationForm tenants={companies} />
       <OperationsForm tenants={companies} />
       <TenantAdminForm tenants={companies} />

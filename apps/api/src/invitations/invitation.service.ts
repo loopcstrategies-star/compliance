@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import type { Response } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService, type Tx } from '../prisma/prisma.service';
 import { hashToken } from '../crypto/secrets';
 import { redact } from '../common/redact';
 import { CUSTOMER_TYPES, INVITATION_TTL_MS, type CustomerType } from '../domain';
@@ -136,6 +136,7 @@ export class InvitationService {
         if (existing.tenantId !== invitation.tenantId) {
           throw new ForbiddenException('Tenant mismatch');
         }
+        await ensureDraft(tx, invitation, existing.id);
         await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
         return existing;
       }
@@ -150,17 +151,7 @@ export class InvitationService {
       await tx.userRole.create({
         data: { tenantId: invitation.tenantId, userId: created.id, roleId: role.id },
       });
-      const customer = await tx.customer.create({
-        data: {
-          tenantId: invitation.tenantId,
-          userId: created.id,
-          legalName: invitation.legalName,
-          customerType: invitation.customerType,
-        },
-      });
-      await tx.application.create({
-        data: { tenantId: invitation.tenantId, customerId: customer.id, schemaVersion: 1, status: 'draft' },
-      });
+      await ensureDraft(tx, invitation, created.id);
       await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
       return created;
     });
@@ -173,4 +164,33 @@ export class InvitationService {
 
 function isCustomerType(value: string): value is CustomerType {
   return (CUSTOMER_TYPES as readonly string[]).includes(value);
+}
+
+async function ensureDraft(
+  tx: Tx,
+  invitation: { tenantId: string; legalName: string; customerType: string },
+  userId: string,
+) {
+  const customer =
+    (await tx.customer.findUnique({ where: { userId } })) ??
+    (await tx.customer.create({
+      data: {
+        tenantId: invitation.tenantId,
+        userId,
+        legalName: invitation.legalName,
+        customerType: invitation.customerType,
+      },
+    }));
+  if (customer.tenantId !== invitation.tenantId) {
+    throw new ForbiddenException('Tenant mismatch');
+  }
+  const application = await tx.application.findFirst({
+    where: { tenantId: invitation.tenantId, customerId: customer.id },
+    select: { id: true },
+  });
+  if (!application) {
+    await tx.application.create({
+      data: { tenantId: invitation.tenantId, customerId: customer.id, schemaVersion: 1, status: 'draft' },
+    });
+  }
 }

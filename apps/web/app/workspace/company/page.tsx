@@ -6,6 +6,7 @@ import { SegregationForm } from '../../admin/segregation-form';
 import { OperationsForm } from '../../admin/operations-form';
 import { TenantAdminForm } from '../../admin/tenant-admin-form';
 import { CloneForm } from './clone-form';
+import { CreateCompanyForm } from './create-company-form';
 import { CompanyKycPanel } from './company-kyc';
 import { ProfileForm, type CompanyProfile } from './profile-form';
 
@@ -39,6 +40,7 @@ export default async function CompanyPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <h2>Company Profile</h2>
+      <CreateCompanyForm />
       {companies.length === 0 ? <p className="notice">No onboarding company is available.</p> : null}
       {selected ? (
         <p>
