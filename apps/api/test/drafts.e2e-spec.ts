@@ -17,6 +17,7 @@ describe('drafts and invitations', () => {
   let admin: PrismaClient;
   let tenantA: { id: string };
   let tenantB: { id: string };
+  let system: { id: string };
   let employeeSecret: string;
   let employeeBSecret: string;
   let adminSecret: string;
@@ -29,7 +30,7 @@ describe('drafts and invitations', () => {
 
     tenantA = await admin.tenant.create({ data: { name: 'Draft Tenant A' } });
     tenantB = await admin.tenant.create({ data: { name: 'Draft Tenant B' } });
-    const system = await admin.tenant.create({ data: { name: 'Platform', isSystem: true } });
+    system = await admin.tenant.create({ data: { name: 'Platform', isSystem: true } });
     const roles = Object.fromEntries((await admin.role.findMany()).map((role) => [role.key, role.id]));
     const passwordHash = await hashPassword(PASSWORD);
     employeeSecret = new OTPAuth.Secret({ size: 20 }).base32;
@@ -62,6 +63,9 @@ describe('drafts and invitations', () => {
       .send({ email: 'local@example.com', legalName: 'Local Metals LLC', customerType: 'local_company' })
       .expect(201);
     const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    expect(created.body.acceptPath).toMatch(/^\/accept\?token=/);
+    expect(created.body.emailSent).toBe(false);
+    expect(created.body.expiresAt).toBeTruthy();
     expect(token).toBeTruthy();
     expect(logs.join('\n')).not.toContain(token);
     expect(logs.join('\n')).toContain('[redacted]');
@@ -192,11 +196,41 @@ describe('drafts and invitations', () => {
     const next = new URL(`http://localhost${resumed.body.acceptPath}`).searchParams.get('token');
     expect(next).toBeTruthy();
     expect(next).not.toBe(token);
-    expect(JSON.stringify(resumed.body)).not.toContain('sent');
+    expect(resumed.body.emailSent).toBe(false);
     const resumedCustomer = request.agent(app.getHttpServer());
     await resumedCustomer.post('/invitations/accept').send({ token: next }).expect(201);
     expect(await admin.user.count({ where: { email: 'link@example.com' } })).toBe(1);
     await resumedCustomer.get('/applications/current').expect(200);
+  });
+
+  it('keeps an employee inside their company and lets a super admin choose one', async () => {
+    const employee = await login('employee-a@example.com');
+    await employee
+      .post('/invitations')
+      .send({ email: 'crossed@example.com', legalName: 'Crossed Metals', customerType: 'local_company', tenantId: tenantB.id })
+      .expect(403);
+    const own = await employee
+      .post('/invitations')
+      .send({ email: 'own-company@example.com', legalName: 'Own Metals', customerType: 'mine' })
+      .expect(201);
+    expect((await admin.invitation.findUniqueOrThrow({ where: { id: own.body.id } })).tenantId).toBe(tenantA.id);
+
+    const platform = await login('admin@example.com');
+    await platform
+      .post('/invitations')
+      .send({ email: 'platform@example.com', legalName: 'Platform Applicant', customerType: 'individual' })
+      .expect(400);
+    await platform
+      .post('/invitations')
+      .send({ email: 'platform@example.com', legalName: 'Platform Applicant', customerType: 'individual', tenantId: system.id })
+      .expect(400);
+    const selected = await platform
+      .post('/invitations')
+      .send({ email: 'chosen@example.com', legalName: 'Chosen Metals', customerType: 'foreign_company', tenantId: tenantA.id })
+      .expect(201);
+    expect(selected.body.emailSent).toBe(false);
+    expect(selected.body.acceptPath).toMatch(/^\/accept\?token=/);
+    expect((await admin.invitation.findUniqueOrThrow({ where: { id: selected.body.id } })).tenantId).toBe(tenantA.id);
   });
 
   async function login(email: string) {

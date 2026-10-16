@@ -11,7 +11,7 @@ export class InvitationController {
   @Post()
   @RequirePermissions('invitation.create')
   create(
-    @Body() body: { email?: string; legalName?: string; customerType?: string },
+    @Body() body: { email?: string; legalName?: string; customerType?: string; tenantId?: string },
     @Req() req: AuthedRequest,
   ) {
     if (typeof body?.email !== 'string' || typeof body.legalName !== 'string' || typeof body.customerType !== 'string') {
@@ -21,16 +21,17 @@ export class InvitationController {
       email: body.email,
       legalName: body.legalName,
       customerType: body.customerType,
+      tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
     });
   }
 
   @Post('resume')
   @RequirePermissions('invitation.create')
-  resume(@Body() body: { email?: string }, @Req() req: AuthedRequest) {
+  resume(@Body() body: { email?: string; tenantId?: string }, @Req() req: AuthedRequest) {
     if (typeof body?.email !== 'string') {
       throw new BadRequestException('Email is required');
     }
-    return this.invitations.resume(req.auth!, body.email);
+    return this.invitations.resume(req.auth!, body.email, typeof body.tenantId === 'string' ? body.tenantId : undefined);
   }
 
   @Post(':id/revoke')

@@ -14,10 +14,10 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     <>
       <h2>New Request</h2>
       <TenantPicker tenants={tenants} tenantId={tenantId} href="/workspace/requests" />
-      {me.roles.includes('maker') ? (
+      {me.roles.some((role) => role === 'employee' || role === 'maker' || role === 'super_admin') ? (
         <>
-          <InviteForm />
-          <ResumeForm />
+          <InviteForm companies={tenants.filter((tenant) => !tenant.isSystem)} />
+          <ResumeForm companies={tenants.filter((tenant) => !tenant.isSystem)} />
         </>
       ) : null}
       {board ? (
