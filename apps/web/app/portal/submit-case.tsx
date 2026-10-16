@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Draft } from './draft-form';
 
-const OPEN = new Set(['draft', 'correction', 'reassessment']);
+const OPEN = new Set(['draft', 'correction']);
 
 export function SubmitCase({ draft }: { draft: Draft }) {
   const router = useRouter();
@@ -17,10 +17,21 @@ export function SubmitCase({ draft }: { draft: Draft }) {
     setError('');
     const response = await fetch(`/api/applications/${draft.application.id}/submit`, { method: 'POST' });
     if (!response.ok) {
-      setError('The case was not submitted.');
+      const body = (await response.json().catch(() => null)) as {
+        message?: string;
+        missingAnswers?: string[];
+        missingUploads?: string[];
+        blockedPlacements?: string[];
+      } | null;
+      const parts = [
+        body?.missingAnswers?.length ? `Missing answers: ${body.missingAnswers.join(', ')}` : '',
+        body?.missingUploads?.length ? `Missing uploads: ${body.missingUploads.join(', ')}` : '',
+        body?.blockedPlacements?.length ? `PDF placements blocked: ${body.blockedPlacements.join(', ')}` : '',
+      ].filter(Boolean);
+      setError(parts.join(' ') || body?.message || 'The case was not submitted.');
       return;
     }
-    setMessage('Submitted for maker review.');
+    setMessage('Submitted for review.');
     router.refresh();
   }
 

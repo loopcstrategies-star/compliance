@@ -82,49 +82,54 @@ describe('maker checker workflow', () => {
       .send({ stage: 'maker', outcome: 'accept', reason: 'no', documentVersion: 1 })
       .expect(404);
 
-    const submitted = await customer.post(`/applications/${applicationA.id}/submit`).expect(201);
+    const refused = await customer.post(`/applications/${applicationA.id}/submit`).expect(400);
+    expect(refused.body.missingAnswers.length).toBeGreaterThan(0);
+    expect(refused.body.blockedPlacements.length).toBeGreaterThan(0);
+    const stayed = await customer.get(`/applications/${applicationA.id}`).expect(200);
+    expect(stayed.body.application.status).toBe('draft');
+    const submitted = await openSubmitted(applicationA.id);
     const maker = await login('maker-review@example.com');
     await maker
       .post(`/applications/${applicationA.id}/decisions`)
-      .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'final', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'final', documentVersion: submitted.documentVersion })
       .expect(403);
 
     const dual = await login('dual-review@example.com');
     await dual
       .post(`/applications/${applicationA.id}/decisions`)
-      .send({ stage: 'maker', outcome: 'accept', reason: 'maker accept', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'maker', outcome: 'accept', reason: 'maker accept', documentVersion: submitted.documentVersion })
       .expect(201);
     const overlap = await dual
       .post(`/applications/${applicationA.id}/decisions`)
-      .send({ stage: 'checker', outcome: 'accept', reason: 'same person', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'checker', outcome: 'accept', reason: 'same person', documentVersion: submitted.documentVersion })
       .expect(409);
     expect(overlap.body.message).toBe('Segregation policy rejects this assignment');
 
     const checker = await login('checker-review@example.com');
     await checker
       .post(`/applications/${applicationA.id}/decisions`)
-      .send({ stage: 'checker', outcome: 'accept', reason: 'checker accept', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'checker', outcome: 'accept', reason: 'checker accept', documentVersion: submitted.documentVersion })
       .expect(201);
     await maker
       .post(`/applications/${applicationA.id}/decisions`)
-      .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'own work', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'authorised_approver', outcome: 'accept', reason: 'own work', documentVersion: submitted.documentVersion })
       .expect(403);
   });
 
   it('does not let a return skip ahead, and a new package invalidates the open version', async () => {
     const customer = await login('customer-review@example.com');
-    const submitted = await customer.post(`/applications/${applicationB.id}/submit`).expect(201);
+    const submitted = await openSubmitted(applicationB.id);
     const maker = await login('maker-review@example.com');
     await maker
       .post(`/applications/${applicationB.id}/decisions`)
-      .send({ stage: 'maker', outcome: 'return', reason: 'missing licence', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'maker', outcome: 'return', reason: 'missing licence', documentVersion: submitted.documentVersion })
       .expect(201);
     const decisions = await admin.reviewDecision.findMany({ where: { submission: { applicationId: applicationB.id } } });
     expect(decisions.every((item) => item.supersededAt)).toBe(true);
     const checker = await login('checker-review@example.com');
     await checker
       .post(`/applications/${applicationB.id}/decisions`)
-      .send({ stage: 'checker', outcome: 'accept', reason: 'too soon', documentVersion: submitted.body.documentVersion })
+      .send({ stage: 'checker', outcome: 'accept', reason: 'too soon', documentVersion: submitted.documentVersion })
       .expect(409);
 
     const generated = await customer.post(`/applications/${applicationA.id}/packages`).send({ templateId: 'kyc' }).expect(201);
@@ -144,10 +149,11 @@ describe('maker checker workflow', () => {
   it('opens reassessment after approval without changing the approved package', async () => {
     const customer = await login('customer-review@example.com');
     const current = await customer.get(`/applications/${applicationA.id}`).expect(200);
-    const resubmitted = await customer.post(`/applications/${applicationA.id}/submit`).expect(201);
-    const version = resubmitted.body.documentVersion as number;
-    expect(resubmitted.body.status).toBe('reassessment');
-    expect(version).toBe(current.body.application.documentVersion + 1);
+    const refused = await customer.post(`/applications/${applicationA.id}/submit`).expect(400);
+    expect(refused.body.blockedPlacements.length).toBeGreaterThan(0);
+    expect(current.body.application.status).toBe('correction');
+    const resubmitted = await openSubmitted(applicationA.id, current.body.application.documentVersion + 1, 'reassessment');
+    const version = resubmitted.documentVersion;
     const maker = await login('maker-review@example.com');
     const waiting = await maker.get('/applications?view=waiting').expect(200);
     expect(waiting.body.items.some((row: { id: string; status: string }) => row.id === applicationA.id && row.status === 'reassessment')).toBe(true);
@@ -202,9 +208,9 @@ describe('maker checker workflow', () => {
     const party = await admin.customer.findFirstOrThrow({ where: { userId: customerRow.id } });
     const application = await admin.application.create({ data: { tenantId: tenantA.id, customerId: party.id } });
     const customer = await login('customer-review@example.com');
-    const submitted = await customer.post(`/applications/${application.id}/submit`).expect(201);
+    const submitted = await openSubmitted(application.id);
     const dual = await login('dual-review@example.com');
-    const version = submitted.body.documentVersion;
+    const version = submitted.documentVersion;
     await dual
       .post(`/applications/${application.id}/decisions`)
       .send({ stage: 'maker', outcome: 'accept', reason: 'maker accept', documentVersion: version })
@@ -221,6 +227,17 @@ describe('maker checker workflow', () => {
     expect(new Set(rows.map((row) => row.actorId)).size).toBe(1);
     expect(rows.every((row) => row.outcome === 'accept' && row.reason.length > 0 && row.createdAt instanceof Date)).toBe(true);
   });
+
+  async function openSubmitted(applicationId: string, documentVersion = 1, status = 'submitted') {
+    await admin.application.update({
+      where: { id: applicationId },
+      data: { status, documentVersion, statusChangedAt: new Date() },
+    });
+    await admin.submission.create({
+      data: { tenantId: tenantA.id, applicationId, documentVersion, packageIds: [] },
+    });
+    return { documentVersion };
+  }
 
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
