@@ -285,10 +285,21 @@ export class ReviewService {
   }
 
   async submit(auth: AuthState, applicationId: string) {
+    await ensureFormCatalogue(this.prisma);
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await visibleApplication(tx, auth, applicationId);
       if (!SUBMITTABLE.has(application.status)) {
         throw new BadRequestException('This case cannot be submitted');
+      }
+      const gaps = await this.submissionGaps(tx, auth.tenantId, application);
+      if (gaps.missingAnswers.length > 0 || gaps.missingUploads.length > 0 || gaps.blockedPlacements.length > 0) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: 'Submission is incomplete',
+          missingAnswers: gaps.missingAnswers,
+          missingUploads: gaps.missingUploads,
+          blockedPlacements: gaps.blockedPlacements,
+        });
       }
       const packages = await tx.generatedPackage.findMany({
         where: { applicationId, tenantId: auth.tenantId },
@@ -406,43 +417,74 @@ export class ReviewService {
     await ensureFormCatalogue(this.prisma);
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await visibleApplication(tx, auth, applicationId);
-      const rules = await tx.applicabilityRule.findMany({ where: { customerType: application.customer.customerType } });
-      const fields = await tx.formField.findMany({
-        where: { schema: { version: application.schemaVersion } },
-        include: { schema: true },
-        orderBy: { sortOrder: 'asc' },
-      });
-      const answers = await tx.answer.findMany({ where: { applicationId } });
-      const documents = await tx.document.findMany({ where: { applicationId }, select: { fieldKey: true } });
-      const answered = new Set(answers.filter((answer) => !emptyValue(answer.value)).map((answer) => answer.fieldKey));
-      const uploaded = new Set(documents.map((item) => item.fieldKey));
-      const missingAnswers: string[] = [];
-      const missingUploads: string[] = [];
-      for (const field of fields) {
-        if (!(await isTemplateRequired(tx, auth.tenantId, application.customer.customerType, field.schema.templateId))) {
-          continue;
-        }
-        const fieldRule = rules.find((rule) => rule.templateId === field.schema.templateId && rule.fieldKey === field.fieldKey);
-        if (fieldRule && !fieldRule.required) {
-          continue;
-        }
-        if (field.fieldKey.startsWith('kyc.docs.')) {
-          if (!uploaded.has(field.fieldKey)) {
-            missingUploads.push(field.fieldKey);
-          }
-          continue;
-        }
-        if (!answered.has(field.fieldKey)) {
-          missingAnswers.push(field.fieldKey);
-        }
-      }
+      const gaps = await this.submissionGaps(tx, auth.tenantId, application);
       return {
         applicationId,
         status: application.status,
-        missingAnswers,
-        missingUploads,
+        ...gaps,
       };
     });
+  }
+
+  private async submissionGaps(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    application: { id: string; schemaVersion: number; customer: { customerType: string } },
+  ) {
+    const rules = await tx.applicabilityRule.findMany({ where: { customerType: application.customer.customerType } });
+    const fields = await tx.formField.findMany({
+      where: { schema: { version: application.schemaVersion } },
+      include: { schema: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const answers = await tx.answer.findMany({ where: { applicationId: application.id } });
+    const documents = await tx.document.findMany({ where: { applicationId: application.id }, select: { fieldKey: true } });
+    const answered = new Set(answers.filter((answer) => !emptyValue(answer.value)).map((answer) => answer.fieldKey));
+    const uploaded = new Set(documents.map((item) => item.fieldKey));
+    const missingAnswers: string[] = [];
+    const missingUploads: string[] = [];
+    const requiredKeys = new Set<string>();
+    const requiredTemplates = new Set<string>();
+    for (const field of fields) {
+      if (!(await isTemplateRequired(tx, tenantId, application.customer.customerType, field.schema.templateId))) {
+        continue;
+      }
+      requiredTemplates.add(field.schema.templateId);
+      const fieldRule = rules.find((rule) => rule.templateId === field.schema.templateId && rule.fieldKey === field.fieldKey);
+      if (fieldRule && !fieldRule.required) {
+        continue;
+      }
+      requiredKeys.add(field.fieldKey);
+      if (field.fieldKey.startsWith('kyc.docs.')) {
+        if (!uploaded.has(field.fieldKey)) {
+          missingUploads.push(field.fieldKey);
+        }
+        continue;
+      }
+      if (!answered.has(field.fieldKey)) {
+        missingAnswers.push(field.fieldKey);
+      }
+    }
+    const packages = await tx.generatedPackage.findMany({
+      where: { applicationId: application.id, tenantId },
+      orderBy: { version: 'desc' },
+      select: { templateId: true, blocked: true },
+    });
+    const blockedPlacements: string[] = [];
+    for (const templateId of requiredTemplates) {
+      const latest = packages.find((item) => item.templateId === templateId);
+      if (!latest) {
+        blockedPlacements.push(templateId);
+        continue;
+      }
+      const blocked = Array.isArray(latest.blocked) ? latest.blocked : [];
+      for (const slot of blocked) {
+        if (slot && typeof slot === 'object' && 'fieldKey' in slot && typeof slot.fieldKey === 'string' && requiredKeys.has(slot.fieldKey)) {
+          blockedPlacements.push(slot.fieldKey);
+        }
+      }
+    }
+    return { missingAnswers, missingUploads, blockedPlacements };
   }
 
   async getPolicy(tenantId: string) {
