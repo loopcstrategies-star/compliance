@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequirePermissions } from '../auth/auth.decorator';
+import { assertUniqueTenantName, duplicateNameError } from './tenant-name';
 
 const profileSelect = {
   id: true,
@@ -31,14 +32,20 @@ export class TenantsController {
 
   @Post()
   @RequirePermissions('tenant.manage')
-  create(@Body() body: { name?: string }) {
-    if (typeof body?.name !== 'string' || !body.name.trim()) {
+  async create(@Body() body: { name?: string }) {
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    if (!name) {
       throw new BadRequestException('Name is required');
     }
-    return this.prisma.tenant.create({
-      data: { name: body.name.trim() },
-      select: { id: true, name: true, isSystem: true },
-    });
+    await assertUniqueTenantName(this.prisma, name);
+    try {
+      return await this.prisma.tenant.create({
+        data: { name, isSystem: false },
+        select: { id: true, name: true, isSystem: true },
+      });
+    } catch (error) {
+      throw duplicateNameError(error);
+    }
   }
 
   @Get(':id/profile')
@@ -100,25 +107,32 @@ export class TenantsController {
     if (!source || source.isSystem) {
       throw new BadRequestException('This tenant cannot be copied');
     }
-    const created = await this.prisma.tenant.create({
-      data: {
-        name: body.name.trim(),
-        isSystem: false,
-        ...(body.copyProfile
-          ? {
-              displayName: source.displayName,
-              registrationId: source.registrationId,
-              registeredAddress: source.registeredAddress,
-              operatingAddress: source.operatingAddress,
-              country: source.country,
-              phone: source.phone,
-              website: source.website,
-              complianceEmail: source.complianceEmail,
-            }
-          : {}),
-      },
-      select: { id: true, name: true, isSystem: true },
-    });
+    const name = body.name.trim();
+    await assertUniqueTenantName(this.prisma, name);
+    let created: { id: string; name: string; isSystem: boolean };
+    try {
+      created = await this.prisma.tenant.create({
+        data: {
+          name,
+          isSystem: false,
+          ...(body.copyProfile
+            ? {
+                displayName: source.displayName,
+                registrationId: source.registrationId,
+                registeredAddress: source.registeredAddress,
+                operatingAddress: source.operatingAddress,
+                country: source.country,
+                phone: source.phone,
+                website: source.website,
+                complianceEmail: source.complianceEmail,
+              }
+            : {}),
+        },
+        select: { id: true, name: true, isSystem: true },
+      });
+    } catch (error) {
+      throw duplicateNameError(error);
+    }
     if (body.copyApplicability) {
       const rows = await this.prisma.tenantApplicability.findMany({ where: { tenantId: id } });
       if (rows.length > 0) {

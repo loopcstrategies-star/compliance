@@ -218,6 +218,18 @@ describe('administration and retention', () => {
     await outsider.get(`/tenants/${tenantA.id}/company-kyc`).expect(403);
   });
 
+  it('creates an onboarding company and rejects a matching name', async () => {
+    const session = await login('admin-a@example.com');
+    const created = await session.post('/tenants').send({ name: 'MYKA' }).expect(201);
+    expect(created.body.isSystem).toBe(false);
+    expect(created.body.name).toBe('MYKA');
+    const duplicate = await session.post('/tenants').send({ name: 'myka' }).expect(400);
+    expect(duplicate.body.message).toBe('A company with this name already exists');
+    const renamed = await session.patch(`/tenants/${tenantA.id}`).send({ name: 'MYKA' }).expect(400);
+    expect(renamed.body.message).toBe('A company with this name already exists');
+    await session.patch(`/tenants/${created.body.id}`).send({ name: 'myka' }).expect(200);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });

@@ -9,15 +9,21 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const me = await requireArea(['employee', 'maker', 'checker', 'authorised_approver', 'super_admin']);
   const query = await searchParams;
   const { tenantId, tenants, failed } = await resolveTenant(me, query.tenant);
-  const board = failed ? null : await loadBoard('requests', tenantId);
+  const companies = tenants.filter((tenant) => !tenant.isSystem);
+  const boardTenant = companies.some((tenant) => tenant.id === tenantId) ? tenantId : (companies[0]?.id ?? tenantId);
+  const board = failed ? null : await loadBoard('requests', boardTenant);
+  const canInvite = me.roles.some((role) => role === 'employee' || role === 'maker' || role === 'super_admin');
   return (
     <>
       <h2>New Request</h2>
-      <TenantPicker tenants={tenants} tenantId={tenantId} href="/workspace/requests" />
-      {me.roles.some((role) => role === 'employee' || role === 'maker' || role === 'super_admin') ? (
+      <TenantPicker tenants={companies} tenantId={boardTenant} href="/workspace/requests" />
+      {canInvite && me.roles.includes('super_admin') && companies.length === 0 ? (
+        <p className="notice">Create an onboarding company under Company Profile before issuing a customer link.</p>
+      ) : null}
+      {canInvite && !(me.roles.includes('super_admin') && companies.length === 0) ? (
         <>
-          <InviteForm companies={tenants.filter((tenant) => !tenant.isSystem)} />
-          <ResumeForm companies={tenants.filter((tenant) => !tenant.isSystem)} />
+          <InviteForm companies={companies} />
+          <ResumeForm companies={companies} />
         </>
       ) : null}
       {board ? (

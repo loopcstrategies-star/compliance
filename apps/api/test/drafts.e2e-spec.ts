@@ -233,6 +233,27 @@ describe('drafts and invitations', () => {
     expect((await admin.invitation.findUniqueOrThrow({ where: { id: selected.body.id } })).tenantId).toBe(tenantA.id);
   });
 
+  it('gives an existing customer a draft application when one is missing', async () => {
+    const roles = Object.fromEntries((await admin.role.findMany()).map((role) => [role.key, role.id]));
+    const passwordHash = await hashPassword(PASSWORD);
+    const user = await createUser(admin, tenantA.id, 'orphan@example.com', 'Orphan Metals', passwordHash, roles.customer, null);
+    await admin.customer.create({
+      data: { tenantId: tenantA.id, userId: user.id, legalName: 'Orphan Metals', customerType: 'individual' },
+    });
+    expect(await admin.application.count({ where: { tenantId: tenantA.id, customer: { userId: user.id } } })).toBe(0);
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'orphan@example.com', legalName: 'Orphan Metals', customerType: 'individual' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token }).expect(201);
+    expect(await admin.user.count({ where: { email: 'orphan@example.com' } })).toBe(1);
+    expect(await admin.application.count({ where: { tenantId: tenantA.id, customer: { userId: user.id }, status: 'draft' } })).toBe(1);
+    await customer.get('/applications/current').expect(200);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });

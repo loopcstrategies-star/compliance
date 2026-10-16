@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { staffFailure } from '../lib/staff-error';
 
 const TYPES = [
   { value: 'local_company', label: 'Local company' },
@@ -35,7 +36,7 @@ export function InviteForm({ companies = [] }: { companies?: Company[] }) {
       }),
     });
     if (!response.ok) {
-      setError('The invitation was not created.');
+      setError(await staffFailure(response, 'The invitation was not created.'));
       return;
     }
     const body = (await response.json()) as { acceptPath: string; expiresAt: string; emailSent: boolean };
