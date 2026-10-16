@@ -12,6 +12,7 @@ export type ReviewCase = {
 
 const STAGE_FOR: Record<string, string> = {
   submitted: 'maker',
+  reassessment: 'maker',
   maker_review: 'checker',
   checker_review: 'authorised_approver',
 };

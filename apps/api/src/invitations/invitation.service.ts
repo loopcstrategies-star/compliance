@@ -109,6 +109,14 @@ export class InvitationService {
     const passwordHash = await hashPassword(password || randomBytes(32).toString('base64url'));
     const role = await this.prisma.role.findUniqueOrThrow({ where: { key: 'customer' } });
     const user = await this.prisma.withTenant(invitation.tenantId, async (tx) => {
+      const existing = await tx.user.findUnique({ where: { email: invitation.email } });
+      if (existing) {
+        if (existing.tenantId !== invitation.tenantId) {
+          throw new ForbiddenException('Tenant mismatch');
+        }
+        await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
+        return existing;
+      }
       const created = await tx.user.create({
         data: {
           tenantId: invitation.tenantId,
