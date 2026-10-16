@@ -6,6 +6,45 @@ type Answer = { fieldKey: string; value: unknown };
 type Evidence = { id: string; documentType: string; expiresOn: string | null };
 type Grant = { id: string; recipientName: string; expiresAt: string; revokedAt: string | null };
 
+const ROW_KEYS = new Set([
+  'kyc.shareholder_entity.rows',
+  'kyc.ubo.rows',
+  'kyc.shareholder_individual.rows',
+  'kyc.management.rows',
+]);
+
+const PROFILE_FIELDS = [
+  { key: 'kyc.entity.name', label: 'Registered name' },
+  { key: 'kyc.entity.registered_office_address', label: 'Registered office' },
+  { key: 'kyc.entity.city', label: 'City' },
+  { key: 'kyc.entity.country', label: 'Country' },
+  { key: 'kyc.entity.registered_email', label: 'Registered email' },
+  { key: 'kyc.entity.telephone_fax', label: 'Telephone' },
+  { key: 'kyc.entity.registration_no', label: 'Registration number' },
+  { key: 'kyc.shareholder_entity.rows', label: 'Entity shareholders at or above 5%' },
+  { key: 'kyc.ubo.rows', label: 'Ultimate beneficial owners' },
+  { key: 'kyc.shareholder_individual.rows', label: 'Individual shareholders at or above 5%' },
+  { key: 'kyc.management.rows', label: 'Management' },
+  { key: 'kyc.pep.a', label: 'PEP question a' },
+  { key: 'kyc.pep.b', label: 'PEP question b' },
+  { key: 'kyc.bank.name', label: 'Bank name' },
+  { key: 'kyc.bank.iban', label: 'IBAN' },
+  { key: 'kyc.bank.swift', label: 'SWIFT' },
+  { key: 'kyc.docs.1', label: 'Trade, mining, or commercial licence' },
+  { key: 'kyc.docs.2', label: 'Certificate of incorporation' },
+  { key: 'kyc.docs.3', label: 'Registry extract' },
+  { key: 'kyc.docs.4', label: 'Shareholder certificate' },
+  { key: 'kyc.docs.5', label: 'Memorandum of association' },
+  { key: 'kyc.docs.6', label: 'Articles of association' },
+  { key: 'kyc.docs.7', label: 'Proof of address' },
+  { key: 'kyc.docs.8', label: 'Shareholder identity' },
+  { key: 'kyc.docs.9', label: 'UBO identity' },
+  { key: 'kyc.docs.10', label: 'Director and management identity' },
+  { key: 'kyc.docs.11', label: 'Authorised representative identity' },
+  { key: 'kyc.docs.12', label: 'VAT certificate' },
+  { key: 'kyc.docs.13', label: 'AML policies' },
+];
+
 export function CompanyKycPanel({
   tenantId,
   profile,
@@ -22,18 +61,11 @@ export function CompanyKycPanel({
     setMessage('');
     setError('');
     const form = new FormData(event.currentTarget);
+    const answers = Object.fromEntries(PROFILE_FIELDS.map((field) => [field.key, storedValue(field.key, form.get(field.key))]));
     const response = await fetch(`/api/tenants/${tenantId}/company-kyc`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        status,
-        answers: {
-          'kyc.entity.name': form.get('legalName'),
-          'kyc.entity.country': form.get('country'),
-          'kyc.entity.registered_email': form.get('email'),
-          'kyc.entity.telephone_fax': form.get('phone'),
-        },
-      }),
+      body: JSON.stringify({ status, answers }),
     });
     if (!response.ok) {
       setError('The company KYC profile was not saved.');
@@ -51,9 +83,13 @@ export function CompanyKycPanel({
       setError('Confirm the selected fields before sharing.');
       return;
     }
-    const fieldKeys = ['kyc.entity.name', 'kyc.entity.country', 'kyc.entity.registered_email', 'kyc.entity.telephone_fax'].filter(
-      (key) => form.get(key) === 'on',
-    );
+    const purpose = String(form.get('purpose') ?? '').trim();
+    if (!purpose) {
+      setError('A purpose is required.');
+      return;
+    }
+    const fieldKeys = PROFILE_FIELDS.map((field) => field.key).filter((key) => form.get(key) === 'on');
+    const evidenceIds = profile.evidence.map((item) => item.id).filter((id) => form.get(`evidence:${id}`) === 'on');
     const response = await fetch(`/api/tenants/${tenantId}/company-kyc/shares`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -61,8 +97,9 @@ export function CompanyKycPanel({
         confirm: true,
         recipientName: form.get('recipientName'),
         recipientContact: form.get('recipientContact'),
+        purpose,
         fieldKeys,
-        evidenceIds: [],
+        evidenceIds,
       }),
     });
     if (!response.ok) {
@@ -87,22 +124,12 @@ export function CompanyKycPanel({
           return save(event, submitter?.value === 'ready' ? 'ready' : 'draft');
         }}
       >
-        <label>
-          Registered name
-          <input name="legalName" defaultValue={text(saved['kyc.entity.name'])} />
-        </label>
-        <label>
-          Country
-          <input name="country" defaultValue={text(saved['kyc.entity.country'])} />
-        </label>
-        <label>
-          Registered email
-          <input name="email" defaultValue={text(saved['kyc.entity.registered_email'])} />
-        </label>
-        <label>
-          Telephone
-          <input name="phone" defaultValue={text(saved['kyc.entity.telephone_fax'])} />
-        </label>
+        {PROFILE_FIELDS.map((field) => (
+          <label key={field.key}>
+            {field.label}
+            <input name={field.key} defaultValue={shownValue(field.key, saved[field.key])} />
+          </label>
+        ))}
         <div className="actions">
           <button type="submit" value="draft">
             Save draft
@@ -162,17 +189,19 @@ export function CompanyKycPanel({
           <input name="recipientContact" type="email" required />
         </label>
         <label>
-          <input name="kyc.entity.name" type="checkbox" /> Registered name
+          Purpose
+          <input name="purpose" required />
         </label>
-        <label>
-          <input name="kyc.entity.country" type="checkbox" /> Country
-        </label>
-        <label>
-          <input name="kyc.entity.registered_email" type="checkbox" /> Registered email
-        </label>
-        <label>
-          <input name="kyc.entity.telephone_fax" type="checkbox" /> Telephone
-        </label>
+        {PROFILE_FIELDS.map((field) => (
+          <label key={field.key}>
+            <input name={field.key} type="checkbox" /> {field.label}
+          </label>
+        ))}
+        {profile.evidence.map((item) => (
+          <label key={item.id}>
+            <input name={`evidence:${item.id}`} type="checkbox" /> {item.documentType}
+          </label>
+        ))}
         <label>
           <input name="confirm" type="checkbox" value="yes" /> I confirm this selection
         </label>
@@ -191,6 +220,21 @@ export function CompanyKycPanel({
   );
 }
 
-function text(value: unknown): string {
+function storedValue(key: string, raw: FormDataEntryValue | null): unknown {
+  const value = String(raw ?? '').trim();
+  if (ROW_KEYS.has(key)) {
+    return value ? [{ name: value }] : [];
+  }
+  return value;
+}
+
+function shownValue(key: string, value: unknown): string {
+  if (ROW_KEYS.has(key) && Array.isArray(value)) {
+    const first = value[0];
+    if (first && typeof first === 'object' && 'name' in first && typeof first.name === 'string') {
+      return first.name;
+    }
+    return '';
+  }
   return typeof value === 'string' ? value : '';
 }

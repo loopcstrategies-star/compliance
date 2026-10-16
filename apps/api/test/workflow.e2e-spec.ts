@@ -85,6 +85,7 @@ describe('maker checker workflow', () => {
     const refused = await customer.post(`/applications/${applicationA.id}/submit`).expect(400);
     expect(refused.body.missingAnswers.length).toBeGreaterThan(0);
     expect(refused.body.blockedPlacements.length).toBeGreaterThan(0);
+    expect(await admin.submission.count({ where: { applicationId: applicationA.id } })).toBe(0);
     const stayed = await customer.get(`/applications/${applicationA.id}`).expect(200);
     expect(stayed.body.application.status).toBe('draft');
     const submitted = await openSubmitted(applicationA.id);

@@ -177,13 +177,21 @@ describe('administration and retention', () => {
     const before = await platform.get('/applications').query({ view: 'dashboard', tenantId: tenantA.id }).expect(200);
     await platform
       .put(`/tenants/${tenantA.id}/company-kyc`)
-      .send({ status: 'draft', answers: { 'kyc.entity.name': 'Admin Metals KYC' } })
+      .send({
+        status: 'draft',
+        answers: {
+          'kyc.entity.name': 'Admin Metals KYC',
+          'kyc.shareholder_entity.rows': [{ name: 'Holding Co' }],
+          'kyc.bank.iban': 'AE070331234567890123456',
+        },
+      })
       .expect(200);
     const after = await platform.get('/applications').query({ view: 'dashboard', tenantId: tenantA.id }).expect(200);
     expect(after.body.counts.requests).toBe(before.body.counts.requests);
     expect(after.body.counts.total).toBe(before.body.counts.total);
     const loaded = await platform.get(`/tenants/${tenantA.id}/company-kyc`).expect(200);
     expect(loaded.body.answers.some((answer: { value: string }) => answer.value === 'Admin Metals KYC')).toBe(true);
+    expect(JSON.stringify(loaded.body.answers)).toContain('Holding Co');
     await platform
       .post(`/tenants/${tenantA.id}/company-kyc/shares`)
       .send({ confirm: false, recipientName: 'Other', recipientContact: 'other@example.com', fieldKeys: ['kyc.entity.name'] })
@@ -194,6 +202,7 @@ describe('administration and retention', () => {
         confirm: true,
         recipientName: 'Other Co',
         recipientContact: 'other@example.com',
+        purpose: 'Counterparty KYC request',
         fieldKeys: ['kyc.entity.name'],
       })
       .expect(201);

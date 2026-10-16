@@ -64,27 +64,29 @@ export function QueueTable({
         <table className="queue">
           <thead>
             <tr>
-              <th>Legal name</th>
+              <th>Application</th>
+              <th>Applicant</th>
               <th>Type</th>
+              <th>Status changed</th>
               <th>Status</th>
-              <th>Opened</th>
-              <th>Updated</th>
               <th>Assignee</th>
+              <th>Review</th>
             </tr>
           </thead>
           <tbody>
             {shown.map((item) => (
               <tr key={item.id}>
-                <td>
-                  <a href={`/workspace/cases/${item.id}?tenant=${tenantId}`}>{item.legalName}</a>
-                </td>
+                <td>{item.id}</td>
+                <td>{item.legalName}</td>
                 <td>{label(item.customerType)}</td>
+                <td>{new Date(item.statusChangedAt).toLocaleString()}</td>
                 <td>
                   <span className={`chip ${item.overdue ? 'overdue' : item.status}`}>{label(item.status)}</span>
                 </td>
-                <td>{new Date(item.createdAt).toLocaleDateString()}</td>
-                <td>{new Date(item.statusChangedAt).toLocaleDateString()}</td>
                 <td>{item.assignee || 'Unassigned'}</td>
+                <td>
+                  <a href={`/workspace/cases/${item.id}?tenant=${tenantId}`}>Review</a>
+                </td>
               </tr>
             ))}
           </tbody>

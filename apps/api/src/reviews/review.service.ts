@@ -312,6 +312,11 @@ export class ReviewService {
         }
       }
       const correcting = application.status === 'correction';
+      const [answers, documents] = await Promise.all([
+        tx.answer.findMany({ where: { applicationId }, select: { fieldKey: true, value: true } }),
+        tx.document.findMany({ where: { applicationId }, select: { id: true, fieldKey: true, fileId: true } }),
+      ]);
+      const packageIds = [...latest.values()];
       const updated = await tx.application.update({
         where: { id: applicationId },
         data: {
@@ -319,14 +324,20 @@ export class ReviewService {
           statusChangedAt: new Date(),
           ...(correcting ? { documentVersion: { increment: 1 } } : {}),
         },
-        select: { id: true, status: true, documentVersion: true },
+        select: { id: true, status: true, documentVersion: true, schemaVersion: true },
       });
       const submission = await tx.submission.create({
         data: {
           tenantId: auth.tenantId,
           applicationId,
           documentVersion: updated.documentVersion,
-          packageIds: [...latest.values()],
+          packageIds,
+          snapshot: {
+            schemaVersion: updated.schemaVersion,
+            answers: Object.fromEntries(answers.map((answer) => [answer.fieldKey, answer.value])),
+            evidenceIds: documents.map((item) => item.id),
+            packageIds,
+          },
         },
       });
       return { ...updated, submissionId: submission.id };
