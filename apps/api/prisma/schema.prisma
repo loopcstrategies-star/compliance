@@ -437,6 +437,7 @@ model Submission {
   applicationId   String           @map("application_id") @db.Uuid
   documentVersion Int              @map("document_version")
   packageIds      Json             @map("package_ids")
+  snapshot        Json?
   supersededAt    DateTime?        @map("superseded_at")
   createdAt       DateTime         @default(now()) @map("created_at")
   tenant          Tenant           @relation(fields: [tenantId], references: [id])

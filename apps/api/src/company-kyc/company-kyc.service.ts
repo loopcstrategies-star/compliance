@@ -102,6 +102,7 @@ export class CompanyKycService {
       confirm?: boolean;
       recipientName?: string;
       recipientContact?: string;
+      purpose?: string;
       fieldKeys?: string[];
       evidenceIds?: string[];
       expiresInDays?: number;
@@ -113,10 +114,11 @@ export class CompanyKycService {
     }
     const recipientName = input.recipientName?.trim() ?? '';
     const recipientContact = input.recipientContact?.trim() ?? '';
+    const purpose = input.purpose?.trim() ?? '';
     const fieldKeys = Array.isArray(input.fieldKeys) ? input.fieldKeys.filter((key) => typeof key === 'string') : [];
     const evidenceIds = Array.isArray(input.evidenceIds) ? input.evidenceIds.filter((key) => typeof key === 'string') : [];
-    if (!recipientName || !recipientContact || (fieldKeys.length === 0 && evidenceIds.length === 0)) {
-      throw new BadRequestException('Recipient and a selection are required');
+    if (!recipientName || !recipientContact || !purpose || (fieldKeys.length === 0 && evidenceIds.length === 0)) {
+      throw new BadRequestException('Recipient, purpose, and a selection are required');
     }
     const days = input.expiresInDays === 7 || input.expiresInDays === 30 ? input.expiresInDays : 7;
     const raw = randomBytes(32).toString('base64url');
@@ -150,7 +152,7 @@ export class CompanyKycService {
           action: 'company_kyc.share',
           targetType: 'profile_share',
           targetId: grant.id,
-          purpose: recipientContact,
+          purpose,
         },
       });
       return { id: grant.id, acceptPath: `/share?token=${encodeURIComponent(raw)}`, emailSent: false, expiresAt: grant.expiresAt };

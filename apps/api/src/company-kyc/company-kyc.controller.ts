@@ -48,6 +48,7 @@ export class CompanyKycController {
       confirm?: boolean;
       recipientName?: string;
       recipientContact?: string;
+      purpose?: string;
       fieldKeys?: string[];
       evidenceIds?: string[];
       expiresInDays?: number;
