@@ -9,6 +9,8 @@ import { hashPassword, AuthService } from '../auth/auth.service';
 import type { AuthState } from '../auth/auth.types';
 
 const INVALID = 'Invitation is not valid';
+export const SIGN_OUT_REQUIRED =
+  'Sign out, or open this link in a private browser window, before opening the application.';
 
 @Injectable()
 export class InvitationService {
@@ -126,6 +128,12 @@ export class InvitationService {
     }
     if (current && current.tenantId !== invitation.tenantId) {
       throw new ForbiddenException('Tenant mismatch');
+    }
+    if (current) {
+      const samePerson = current.email.trim().toLowerCase() === invitation.email.trim().toLowerCase();
+      if (!samePerson || !current.roles.includes('customer')) {
+        throw new ForbiddenException(SIGN_OUT_REQUIRED);
+      }
     }
     const displayName = input.displayName?.trim() || invitation.legalName;
     const passwordHash = await hashPassword(password || randomBytes(32).toString('base64url'));
