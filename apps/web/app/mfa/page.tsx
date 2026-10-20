@@ -13,7 +13,7 @@ export default async function MfaPage() {
   return (
     <main className="gate">
       <section className="card">
-        <p className="brand">MYKA</p>
+        <p className="brand">LoopC</p>
         <h1>Verification code</h1>
         <p>Enter the code from your authenticator for {me.email}.</p>
         <MfaForm />
