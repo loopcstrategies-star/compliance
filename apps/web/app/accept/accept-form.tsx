@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { openInvitation } from './open-invitation';
 
 export function AcceptForm({ token }: { token: string }) {
   const router = useRouter();
@@ -11,19 +12,18 @@ export function AcceptForm({ token }: { token: string }) {
   async function openAccount() {
     setPending(true);
     setError('');
-    const response = await fetch('/api/invitations/accept', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-    if (!response.ok) {
+    try {
+      const result = await openInvitation(token);
+      if (!result.redirect) {
+        setError(result.error);
+        return;
+      }
+      window.history.replaceState(null, '', '/accept');
+      router.replace('/portal');
+      router.refresh();
+    } finally {
       setPending(false);
-      setError('This invitation cannot be used.');
-      return;
     }
-    window.history.replaceState(null, '', '/accept');
-    router.replace('/portal');
-    router.refresh();
   }
 
   return (

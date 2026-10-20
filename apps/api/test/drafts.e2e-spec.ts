@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import * as OTPAuth from 'otpauth';
 import { AppModule } from '../src/app.module';
+import { SIGN_OUT_REQUIRED } from '../src/invitations/invitation.service';
 import { hashPassword } from '../src/auth/auth.service';
 import { encryptSecret } from '../src/crypto/secrets';
 import { ensureCatalogue } from '../src/seed/catalogue';
@@ -252,6 +253,33 @@ describe('drafts and invitations', () => {
     expect(await admin.user.count({ where: { email: 'orphan@example.com' } })).toBe(1);
     expect(await admin.application.count({ where: { tenantId: tenantA.id, customer: { userId: user.id }, status: 'draft' } })).toBe(1);
     await customer.get('/applications/current').expect(200);
+  });
+
+  it('lets an unauthenticated customer accept and keeps a staff session from consuming the link', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'fresh@example.com', legalName: 'Fresh Metals', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const blocked = await employee.post('/invitations/accept').send({ token }).expect(403);
+    expect(blocked.body.message).toBe(SIGN_OUT_REQUIRED);
+    expect((await admin.invitation.findUniqueOrThrow({ where: { id: created.body.id } })).usedAt).toBeNull();
+    expect(await admin.user.count({ where: { email: 'fresh@example.com' } })).toBe(0);
+
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token }).expect(201);
+    await customer.get('/applications/current').expect(200);
+    await request(app.getHttpServer()).post('/invitations/accept').send({ token }).expect(400);
+
+    const again = await employee
+      .post('/invitations')
+      .send({ email: 'fresh@example.com', legalName: 'Fresh Metals', customerType: 'local_company' })
+      .expect(201);
+    const next = new URL(`http://localhost${again.body.acceptPath}`).searchParams.get('token');
+    await customer.post('/invitations/accept').send({ token: next }).expect(201);
+    expect(await admin.user.count({ where: { email: 'fresh@example.com' } })).toBe(1);
+    expect(await admin.application.count({ where: { customer: { user: { email: 'fresh@example.com' } } } })).toBe(1);
   });
 
   async function login(email: string) {
