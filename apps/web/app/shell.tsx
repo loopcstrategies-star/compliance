@@ -2,7 +2,19 @@ import type { ReactNode } from 'react';
 import type { Me } from '../lib/session';
 import { tabsForRoles } from '../lib/home';
 import { SignOut } from './sign-out';
+import { StaffAvatar } from './staff-avatar';
 import { StaffNav } from './staff-nav';
+
+function roleLabel(role: string | undefined) {
+  if (!role) {
+    return '';
+  }
+  return role
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
 export function Shell({ title, me, children }: { title: string; me: Me; children?: ReactNode }) {
   const staffTabs = me.roles.some((role) => role !== 'customer') ? tabsForRoles(me.roles) : [];
@@ -16,19 +28,21 @@ export function Shell({ title, me, children }: { title: string; me: Me; children
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-lockup">
-          <span className="monogram" aria-hidden="true">M</span>
+          <span className="monogram" aria-hidden="true">
+            LC
+          </span>
           <span>
-            <strong>MYKA</strong>
+            <strong>LoopC</strong>
             <small>Compliance</small>
           </span>
         </div>
         {staffTabs.length > 0 ? (
           <div className="who">
-            <span className="avatar" aria-hidden="true">{initials || 'M'}</span>
+            <StaffAvatar initials={initials || 'LC'} />
             <span>
               <strong>{me.displayName}</strong>
               <small>{me.email}</small>
-              <em>{me.roles[0]?.replaceAll('_', ' ')}</em>
+              <em className="role-chip">{roleLabel(me.roles[0])}</em>
             </span>
           </div>
         ) : (

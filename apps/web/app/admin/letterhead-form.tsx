@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { letterheadOwnerLabel } from '../../lib/brand-label';
 
 type Template = {
   templateId: string;
@@ -36,7 +37,7 @@ export function LetterheadForm({
     }
     const body = (await response.json()) as Template;
     setOwners((current) => current.map((item) => (item.templateId === body.templateId ? body : item)));
-    setMessage(`Letterhead owner for ${body.templateId} is ${body.letterheadOwner}.`);
+    setMessage(`Letterhead owner for ${body.templateId} is ${letterheadOwnerLabel(body.letterheadOwner)}.`);
   }
 
   async function upload(event: FormEvent<HTMLFormElement>) {
@@ -62,7 +63,7 @@ export function LetterheadForm({
           <select name="templateId" defaultValue={owners[0]?.templateId ?? ''}>
             {owners.map((template) => (
               <option key={template.templateId} value={template.templateId}>
-                {template.templateId} ({template.letterheadOwner})
+                {template.templateId} ({letterheadOwnerLabel(template.letterheadOwner)})
               </option>
             ))}
           </select>
@@ -70,7 +71,7 @@ export function LetterheadForm({
         <label>
           Owner
           <select name="letterheadOwner" defaultValue="myka">
-            <option value="myka">MYKA</option>
+            <option value="myka">LoopC</option>
             <option value="customer">Customer</option>
             <option value="none">None</option>
           </select>

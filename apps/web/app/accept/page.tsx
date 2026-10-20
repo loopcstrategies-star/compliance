@@ -9,7 +9,7 @@ export default async function AcceptPage({
   return (
     <main className="gate">
       <section className="card">
-        <p className="brand">MYKA</p>
+        <p className="brand">LoopC</p>
         <h1>Accept invitation</h1>
         <p>This link opens your onboarding draft. It can be used once.</p>
         {params.token ? <AcceptForm token={params.token} /> : <p className="notice error">This invitation link is incomplete.</p>}

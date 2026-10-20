@@ -9,7 +9,7 @@ export default async function LoginPage({
   return (
     <main className="gate">
       <section className="card">
-        <p className="brand">MYKA</p>
+        <p className="brand">LoopC</p>
         <h1>Sign in</h1>
         <p>Use the account issued for your organisation.</p>
         {params.denied ? <p className="notice error">That area is not available for this role.</p> : null}

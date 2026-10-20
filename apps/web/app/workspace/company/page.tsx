@@ -8,6 +8,7 @@ import { TenantAdminForm } from '../../admin/tenant-admin-form';
 import { CloneForm } from './clone-form';
 import { CreateCompanyForm } from './create-company-form';
 import { CompanyKycPanel } from './company-kyc';
+import { letterheadOwnerLabel } from '../../../lib/brand-label';
 import { ProfileForm, type CompanyProfile } from './profile-form';
 
 type KycProfile = {
@@ -64,7 +65,7 @@ export default async function CompanyPage({ searchParams }: { searchParams: Prom
         {templates.length === 0 ? <p className="notice error">Template status could not be loaded.</p> : null}
         {templates.map((template) => (
           <p key={template.templateId} className={template.blocked ? 'notice error' : 'notice success'}>
-            {template.templateId}: {template.blockedFieldCount} answer slots blocked, {template.unresolvedPlacementCount} placements unresolved, letterhead owner {template.letterheadOwner}. Generation stays blocked while a required slot is unresolved.
+            {template.templateId}: {template.blockedFieldCount} answer slots blocked, {template.unresolvedPlacementCount} placements unresolved, letterhead owner {letterheadOwnerLabel(template.letterheadOwner)}. Generation stays blocked while a required slot is unresolved.
           </p>
         ))}
       </section>

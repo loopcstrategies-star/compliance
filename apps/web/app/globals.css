@@ -191,6 +191,8 @@ h2 {
   background: #c4a35a;
   color: #0b1f3a;
   border-radius: 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
 }
 
 .avatar {
@@ -200,17 +202,25 @@ h2 {
   font-size: 0.8rem;
 }
 
-.who em {
+.avatar-photo {
+  object-fit: cover;
+  padding: 0;
+  background: transparent;
+}
+
+.who em,
+.who .role-chip {
   display: inline-block;
   margin-top: 0.2rem;
   font-style: normal;
   font-size: 0.68rem;
   letter-spacing: 0.04em;
-  text-transform: capitalize;
-  background: rgba(196, 163, 90, 0.18);
-  color: #e7d3a1;
+  text-transform: none;
+  background: #c4a35a;
+  color: #0b1f3a;
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
+  font-weight: 700;
 }
 
 .sidebar nav {
