@@ -28,6 +28,7 @@ import { AdministrationController, AuditController } from './administration/admi
 import { AdministrationService } from './administration/administration.service';
 import { CompanyKycController } from './company-kyc/company-kyc.controller';
 import { CompanyKycService } from './company-kyc/company-kyc.service';
+import { CompanyAssetsController } from './company-assets/company-assets.controller';
 
 @Module({
   controllers: [
@@ -50,6 +51,7 @@ import { CompanyKycService } from './company-kyc/company-kyc.service';
     AdministrationController,
     AuditController,
     CompanyKycController,
+    CompanyAssetsController,
   ],
   providers: [
     PrismaService,

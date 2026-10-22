@@ -750,3 +750,53 @@ table.queue th {
     grid-template-columns: 1fr;
   }
 }
+
+.company-asset-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.company-asset-card .panel-head {
+  align-items: start;
+}
+
+.company-asset-card .panel-head p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.company-asset-card .panel-head > .notice {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.company-asset-saved img {
+  display: block;
+  width: min(100%, 10rem);
+  height: 6.25rem;
+  object-fit: contain;
+  object-position: left center;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.company-asset-saved p {
+  margin: 0.4rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.company-asset-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.company-asset-consent input {
+  margin-top: 0.2rem;
+}

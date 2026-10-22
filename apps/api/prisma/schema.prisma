@@ -40,6 +40,7 @@ model Tenant {
   legalHolds LegalHold[]
   deletionRequests DeletionRequest[]
   companyKycProfile CompanyKycProfile?
+  companyAssets TenantCompanyAsset[]
 
   @@map("tenants")
 }
@@ -348,6 +349,7 @@ model StoredFile {
   letterhead   Letterhead?
   packages     GeneratedPackage[]
   companyEvidence CompanyEvidence[]
+  companyAssets TenantCompanyAsset[]
 
   @@index([tenantId])
   @@map("stored_files")
@@ -564,4 +566,19 @@ model ProfileShareGrant {
 
   @@index([tenantId])
   @@map("profile_share_grants")
+}
+
+model TenantCompanyAsset {
+  id        String     @id @default(uuid()) @db.Uuid
+  tenantId  String     @map("tenant_id") @db.Uuid
+  assetType String     @map("asset_type")
+  fileId    String     @unique @map("file_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  file      StoredFile @relation(fields: [fileId], references: [id])
+
+  @@unique([tenantId, assetType])
+  @@index([tenantId])
+  @@map("tenant_company_assets")
 }
