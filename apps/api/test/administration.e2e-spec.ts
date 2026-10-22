@@ -22,6 +22,7 @@ describe('administration and retention', () => {
   let secretB: string;
   let employeeSecret: string;
   let tenantA: { id: string };
+  let tenantB: { id: string };
   let system: { id: string };
   let adminA: { id: string };
   let adminB: { id: string };
@@ -36,7 +37,7 @@ describe('administration and retention', () => {
     await ensureCatalogue(admin);
     await resetTenantData(admin);
     tenantA = await admin.tenant.create({ data: { name: 'Admin Tenant A' } });
-    const tenantB = await admin.tenant.create({ data: { name: 'Admin Tenant B' } });
+    tenantB = await admin.tenant.create({ data: { name: 'Admin Tenant B' } });
     system = await admin.tenant.create({ data: { name: 'Platform', isSystem: true } });
     const roles = Object.fromEntries((await admin.role.findMany()).map((role) => [role.key, role.id]));
     const passwordHash = await hashPassword(PASSWORD);
@@ -228,6 +229,91 @@ describe('administration and retention', () => {
     const renamed = await session.patch(`/tenants/${tenantA.id}`).send({ name: 'MYKA' }).expect(400);
     expect(renamed.body.message).toBe('A company with this name already exists');
     await session.patch(`/tenants/${created.body.id}`).send({ name: 'myka' }).expect(200);
+  });
+
+  it('saves company image attachments with isolation and rejects PDFs', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+    const platform = await login('admin-a@example.com');
+    const employee = await login('employee-admin@example.com');
+
+    await employee
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'logo')
+      .attach('file', png, 'logo.png')
+      .expect(403);
+
+    await platform
+      .post(`/tenants/${system.id}/company-assets`)
+      .field('assetType', 'logo')
+      .attach('file', png, 'logo.png')
+      .expect(400);
+
+    await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'logo')
+      .attach('file', Buffer.from('%PDF-1.4\n%%EOF'), 'logo.pdf')
+      .expect(400);
+
+    await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'authorised_signature')
+      .attach('file', png, 'sign.png')
+      .expect(400);
+
+    const logo = await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'logo')
+      .attach('file', png, 'logo.png')
+      .expect(201);
+    expect(logo.body.assetType).toBe('logo');
+    expect(logo.body.mediaType).toBe('image/png');
+
+    const stamp = await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'stamp')
+      .attach('file', jpeg, 'stamp.jpg')
+      .expect(201);
+    expect(stamp.body.mediaType).toBe('image/jpeg');
+
+    const letterhead = await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'letterhead')
+      .attach('file', png, 'letterhead.png')
+      .expect(201);
+    expect(letterhead.body.assetType).toBe('letterhead');
+    expect(await admin.letterhead.count({ where: { tenantId: tenantA.id } })).toBe(1);
+
+    const signature = await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'authorised_signature')
+      .field('authorisedUseConfirmed', 'true')
+      .attach('file', png, 'sign.png')
+      .expect(201);
+    expect(signature.body.assetType).toBe('authorised_signature');
+
+    const replaced = await platform
+      .post(`/tenants/${tenantA.id}/company-assets`)
+      .field('assetType', 'logo')
+      .attach('file', jpeg, 'logo2.jpg')
+      .expect(201);
+    expect(replaced.body.fileId).not.toBe(logo.body.fileId);
+    expect(await admin.tenantCompanyAsset.count({ where: { tenantId: tenantA.id, assetType: 'logo' } })).toBe(1);
+
+    const listed = await platform.get(`/tenants/${tenantA.id}/company-assets`).expect(200);
+    expect(listed.body.map((item: { assetType: string }) => item.assetType).sort()).toEqual([
+      'authorised_signature',
+      'letterhead',
+      'logo',
+      'stamp',
+    ]);
+
+    await platform.get(`/tenants/${tenantA.id}/company-assets/logo/content`).expect(200);
+    await platform.get(`/tenants/${tenantB.id}/company-assets/logo/content`).expect(404);
+    await employee.get(`/tenants/${tenantA.id}/company-assets`).expect(403);
   });
 
   async function login(email: string) {

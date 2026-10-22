@@ -144,7 +144,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <div className="quick-grid">
                 {canManage ? <Action href={`/workspace/company?tenant=${tenantId}#copy`} icon="plus" title="Add new company" text="Create a company from selected configuration." /> : null}
                 {canInvite ? <Action href={`/workspace/requests${suffix}`} icon="send" title="Send invitation" text="Issue a one-time onboarding link." /> : null}
-                {canManage ? <Action href={`/workspace/company?tenant=${tenantId}#templates`} icon="upload" title="Upload templates" text="Open template readiness and letterhead." /> : null}
+                {canManage ? <Action href={`/workspace/company?tenant=${tenantId}#company-assets`} icon="upload" title="Company attachments" text="Upload the company logo, stamp, letterhead, and authorised signature." /> : null}
                 <Action href="#overview" icon="chart" title="View reports" text="The counts on this page are the report." />
               </div>
             </article>

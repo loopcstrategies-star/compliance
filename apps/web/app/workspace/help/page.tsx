@@ -15,7 +15,7 @@ export default async function HelpPage() {
       </section>
       <section className="panel">
         <h3>PDF generation</h3>
-        <p>Answer, checkbox, signature, and stamp rectangles that are not measured stay blocked. Company Profile lists those slots. A completed form is not produced while a required slot is unresolved.</p>
+        <p>Answer, checkbox, signature, and stamp placements that have not been measured remain blocked during PDF generation. Company Profile is used to upload and save the company logo, stamp, letterhead image, and authorised person’s signature; these image uploads do not replace template-placement measurement.</p>
       </section>
     </>
   );
