@@ -22,10 +22,10 @@ const prisma = spawnSync('npx prisma migrate deploy', {
 if (prisma.status !== 0) {
   process.exit(prisma.status ?? 1);
 }
-const jest = spawnSync('npx jest --runInBand', {
+const jestBin = path.resolve(cwd, '../../node_modules/jest/bin/jest.js');
+const jest = spawnSync(process.execPath, [jestBin, '--runInBand', ...process.argv.slice(2)], {
   cwd,
   env,
   stdio: 'inherit',
-  shell: true,
 });
 process.exit(jest.status ?? 1);

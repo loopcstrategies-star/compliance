@@ -21,6 +21,7 @@ export async function resetTenantData(admin: PrismaClient): Promise<void> {
   await admin.document.deleteMany();
   await admin.storedFile.deleteMany();
   await admin.answer.deleteMany();
+  await admin.applicationSectionProgress.deleteMany();
   await admin.application.deleteMany();
   await admin.customer.deleteMany();
   await admin.invitation.deleteMany();
