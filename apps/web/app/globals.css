@@ -1040,79 +1040,179 @@ table.queue th {
 
 /* ---- KYC onboarding wizard ---- */
 .onboarding-wizard {
-  display: grid;
-  grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
-  margin-top: 1rem;
-}
-
-.wizard-nav {
-  position: sticky;
-  top: 1rem;
-  padding: 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--panel) 92%, white);
-}
-
-.wizard-nav h3 {
-  margin: 0 0 0.65rem;
-  font-size: 0.95rem;
-}
-
-.wizard-nav ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  --wizard-green: #1f6b4a;
+  --wizard-green-soft: #e8f3ed;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
 }
 
-.wizard-nav button {
-  display: grid;
-  gap: 0.2rem;
-  width: 100%;
-  padding: 0.45rem 0.5rem;
+.wizard-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.wizard-page-head h1 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.45rem, 2.2vw, 1.85rem);
+  color: var(--navy);
+  letter-spacing: -0.02em;
+}
+
+.wizard-page-head p {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.wizard-save-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wizard-save-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.wizard-save-pill--saved {
+  color: var(--wizard-green);
+  border-color: color-mix(in srgb, var(--wizard-green) 35%, white);
+  background: var(--wizard-green-soft);
+}
+
+.wizard-save-pill--saved .wizard-save-dot {
+  background: var(--wizard-green);
+}
+
+.wizard-save-pill--saving .wizard-save-dot {
+  background: var(--teal);
+}
+
+.wizard-save-pill--error {
+  color: var(--danger);
+}
+
+.wizard-save-pill--error .wizard-save-dot {
+  background: var(--danger);
+}
+
+.wizard-stepper {
+  margin: 0 -0.25rem;
+  padding: 0.85rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #fff;
+  overflow-x: auto;
+}
+
+.wizard-stepper ol {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: 0;
+  padding: 0 0.35rem;
+  min-width: max-content;
+}
+
+.wizard-stepper li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.wizard-stepper button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 6.75rem;
+  padding: 0.25rem 0.2rem;
   border: 0;
   border-radius: 0.45rem;
   background: transparent;
-  color: var(--ink);
+  color: var(--muted);
   font: inherit;
-  font-size: 0.82rem;
-  text-align: left;
   cursor: pointer;
 }
 
-.wizard-nav button:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+.wizard-stepper button:hover {
+  background: color-mix(in srgb, var(--wizard-green) 6%, transparent);
 }
 
-.wizard-nav button.is-active {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  font-weight: 600;
-}
-
-.wizard-status {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+.wizard-step-num {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 2px solid #c5d0db;
+  border-radius: 999px;
+  background: #fff;
   color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
-.wizard-status--completed {
-  color: #166534;
+.wizard-step-title {
+  display: block;
+  max-width: 6.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
 }
 
-.wizard-status--in_progress {
-  color: var(--accent);
+.wizard-stepper button.is-active {
+  color: var(--wizard-green);
 }
 
-.wizard-status--review {
-  color: var(--ink);
+.wizard-stepper button.is-active .wizard-step-num {
+  border-color: var(--wizard-green);
+  background: var(--wizard-green);
+  color: #fff;
+}
+
+.wizard-stepper button.is-completed .wizard-step-num {
+  border-color: var(--wizard-green);
+  background: var(--wizard-green-soft);
+  color: var(--wizard-green);
+}
+
+.wizard-step-arrow {
+  width: 0.85rem;
+  height: 1.85rem;
+  margin-top: 0;
+  flex-shrink: 0;
+  background:
+    linear-gradient(90deg, transparent 40%, #c5d0db 40%, #c5d0db 60%, transparent 60%) center / 100% 2px no-repeat,
+    linear-gradient(135deg, transparent 45%, #c5d0db 45%, #c5d0db 55%, transparent 55%) right center / 0.45rem 0.45rem no-repeat;
+  opacity: 0.85;
+}
+
+.wizard-mobile-step {
+  display: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .wizard-main {
@@ -1122,52 +1222,74 @@ table.queue th {
   gap: 1rem;
 }
 
-.wizard-progress-head p {
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
-  color: var(--muted);
+.wizard-section-title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--navy);
 }
 
-.wizard-progress-bar {
-  height: 0.35rem;
-  border-radius: 999px;
-  background: var(--line);
+.wizard-card {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fff;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.wizard-progress-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.2s ease;
+.wizard-card-head {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #f3f7fb 0%, #eef3f8 100%);
 }
 
-.wizard-save-state {
-  margin-top: 0.35rem !important;
-  font-size: 0.85rem !important;
+.wizard-card-head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  color: var(--navy);
 }
 
-.wizard-save-state--saving {
-  color: var(--accent) !important;
+.wizard-card-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  padding: 1rem 1.1rem 1.15rem;
 }
 
-.wizard-save-state--error {
-  color: #b91c1c !important;
-}
-
-.wizard-save-state--saved {
-  color: #166534 !important;
-}
-
-.wizard-section-panel {
+.wizard-card-body--stack {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
 }
 
-.wizard-section-panel h2 {
-  margin: 0;
-  font-size: 1.3rem;
+.wizard-grid-span {
+  grid-column: 1 / -1;
+}
+
+.wizard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.wizard-field-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.wizard-required {
+  margin-left: 0.25rem;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.wizard-field input,
+.wizard-field select,
+.wizard-field textarea {
+  width: 100%;
 }
 
 .wizard-fieldset {
@@ -1225,29 +1347,86 @@ table.queue th {
   overflow-wrap: anywhere;
 }
 
+.wizard-status {
+  display: inline-block;
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wizard-status--completed {
+  color: var(--wizard-green);
+}
+
+.wizard-status--in_progress {
+  color: var(--teal);
+}
+
 .wizard-check {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
 }
 
-.wizard-actions {
+.wizard-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0 0.25rem;
+  border-top: 1px solid var(--line);
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, transparent, #f4f7fb 28%);
+}
+
+.wizard-footer-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding-top: 0.25rem;
+}
+
+.wizard-btn-exit {
+  background: #fff;
+  color: var(--wizard-green);
+  border: 1px solid var(--wizard-green);
+}
+
+.wizard-btn-back {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--line);
+}
+
+.wizard-btn-next {
+  background: var(--wizard-green);
+  color: #fff;
+  min-width: 6.5rem;
 }
 
 @media (max-width: 860px) {
-  .onboarding-wizard {
+  .wizard-card-body {
     grid-template-columns: 1fr;
   }
 
-  .wizard-nav {
-    position: static;
+  .wizard-mobile-step {
+    display: block;
   }
 
-  .wizard-nav ol {
-    display: none;
+  .wizard-stepper button {
+    width: 5.5rem;
+  }
+
+  .wizard-step-title {
+    max-width: 5.25rem;
+    font-size: 0.64rem;
+  }
+
+  .wizard-footer {
+    position: static;
   }
 }

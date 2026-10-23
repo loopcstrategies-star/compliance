@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DocumentsPanel } from '../documents-panel';
 import { SubmitCase } from '../submit-case';
 import { FieldInput } from './field-input';
+import { groupsForSection, isWideField, STEPPER_LABELS } from './section-groups';
 import type { Draft, Field, SectionProgress } from './types';
 
 const REVIEW_KEY = 'review';
@@ -27,7 +28,7 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
   const isReview = activeKey === REVIEW_KEY;
   const activeSection = sections[activeIndex];
   const totalSteps = sections.length;
-  const stepNumber = isReview ? totalSteps : Math.max(1, activeIndex + 1);
+  const stepNumber = isReview ? totalSteps + 1 : Math.max(1, activeIndex + 1);
 
   const activeFields = useMemo(() => {
     if (!activeSection) {
@@ -36,6 +37,13 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
     const keys = new Set(activeSection.fieldKeys);
     return draft.templates.flatMap((template) => template.fields.filter((field) => keys.has(field.fieldKey)));
   }, [activeSection, draft.templates]);
+
+  const fieldGroups = useMemo(() => {
+    if (!activeSection) {
+      return [];
+    }
+    return groupsForSection(activeSection.sectionKey, activeSection.title, activeFields);
+  }, [activeSection, activeFields]);
 
   useEffect(() => {
     setAnswers(draft.answers);
@@ -68,7 +76,8 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
   }
 
   async function persistSection(sectionKey: string, payloadAnswers: Record<string, unknown>, markComplete: boolean) {
-    const section = sectionState.find((item) => item.sectionKey === sectionKey) ?? sections.find((item) => item.sectionKey === sectionKey);
+    const section =
+      sectionState.find((item) => item.sectionKey === sectionKey) ?? sections.find((item) => item.sectionKey === sectionKey);
     if (!section) {
       return false;
     }
@@ -155,133 +164,199 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
     }
   }
 
-  const progressPct = Math.round(((isReview ? totalSteps : stepNumber - 1) / Math.max(totalSteps, 1)) * 100);
+  const saveLabel =
+    saveState === 'saving'
+      ? 'Saving…'
+      : saveState === 'saved'
+        ? 'Draft saved'
+        : saveState === 'error'
+          ? 'Save failed'
+          : 'Draft';
 
   return (
     <div className="onboarding-wizard">
-      <aside className="wizard-nav" aria-label="Form sections">
-        <h3>Onboarding forms</h3>
+      <header className="wizard-page-head">
+        <div>
+          <h1>Customer Due Diligence Questionnaire</h1>
+          <p>
+            Complete all sections below. Your progress is saved automatically.
+            {draft.application.status ? (
+              <>
+                {' '}
+                Status: {draft.application.status.replaceAll('_', ' ')} · {draft.application.customerType.replaceAll('_', ' ')}.
+              </>
+            ) : null}
+          </p>
+        </div>
+        <p className={`wizard-save-pill wizard-save-pill--${saveState}`} role="status">
+          <span className="wizard-save-dot" aria-hidden="true" />
+          {saveLabel}
+        </p>
+      </header>
+
+      <nav className="wizard-stepper" aria-label="Form sections">
         <ol>
-          {sectionState.map((section, index) => (
-            <li key={section.sectionKey}>
-              <button
-                type="button"
-                className={section.sectionKey === activeKey ? 'is-active' : undefined}
-                onClick={() => setActiveKey(section.sectionKey)}
-              >
-                <span className={`wizard-status wizard-status--${section.status}`}>{statusLabel(section.status)}</span>
-                <span>
-                  {index + 1}. {section.title}
-                </span>
-              </button>
-            </li>
-          ))}
+          {sectionState.map((section, index) => {
+            const active = section.sectionKey === activeKey;
+            const completed = section.status === 'completed';
+            return (
+              <li key={section.sectionKey}>
+                <button
+                  type="button"
+                  className={[active ? 'is-active' : '', completed ? 'is-completed' : ''].filter(Boolean).join(' ') || undefined}
+                  onClick={() => setActiveKey(section.sectionKey)}
+                  aria-current={active ? 'step' : undefined}
+                >
+                  <span className="wizard-step-num" aria-hidden="true">
+                    {completed && !active ? '✓' : index + 1}
+                  </span>
+                  <span className="wizard-step-title">{STEPPER_LABELS[section.sectionKey] ?? section.title}</span>
+                </button>
+                <span className="wizard-step-arrow" aria-hidden="true" />
+              </li>
+            );
+          })}
           <li>
-            <button type="button" className={isReview ? 'is-active' : undefined} onClick={() => setActiveKey(REVIEW_KEY)}>
-              <span className="wizard-status wizard-status--review">Review</span>
-              <span>Review answers</span>
+            <button
+              type="button"
+              className={isReview ? 'is-active' : undefined}
+              onClick={() => setActiveKey(REVIEW_KEY)}
+              aria-current={isReview ? 'step' : undefined}
+            >
+              <span className="wizard-step-num" aria-hidden="true">
+                {totalSteps + 1}
+              </span>
+              <span className="wizard-step-title">Review</span>
             </button>
           </li>
         </ol>
-      </aside>
+      </nav>
+
+      <p className="wizard-mobile-step">
+        Step {stepNumber} of {totalSteps + 1}
+        {activeSection ? ` · ${activeSection.title}` : ' · Review answers'}
+      </p>
+
+      {error ? (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {clientError ? (
+        <p className="notice error" role="alert">
+          {clientError}
+        </p>
+      ) : null}
 
       <div className="wizard-main">
-        <header className="wizard-progress-head">
-          <p>
-            Step {isReview ? totalSteps : stepNumber} of {totalSteps}
-            {activeSection ? ` · ${activeSection.title}` : ' · Review answers'}
-          </p>
-          <div className="wizard-progress-bar" aria-hidden="true">
-            <span style={{ width: `${isReview ? 100 : progressPct}%` }} />
-          </div>
-          <p className={`wizard-save-state wizard-save-state--${saveState}`} role="status">
-            {saveState === 'saving' ? 'Saving…' : null}
-            {saveState === 'saved' ? 'Draft saved.' : null}
-            {saveState === 'error' ? 'Save failed.' : null}
-            {saveState === 'idle' ? 'Changes save when you continue or pause typing.' : null}
-          </p>
-        </header>
-
-        {error ? (
-          <p className="notice error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {clientError ? (
-          <p className="notice error" role="alert">
-            {clientError}
-          </p>
-        ) : null}
-
         {!isReview && activeSection ? (
-          <section className="panel wizard-section-panel">
-            <h2>{activeSection.title}</h2>
+          <>
+            <h2 className="wizard-section-title">{activeSection.title}</h2>
             {activeSection.sectionKey === 'kyc.management' ? (
-              <ManagementSplit fields={activeFields} answers={answers} onChange={setValue} />
+              <article className="wizard-card">
+                <header className="wizard-card-head">
+                  <h3>Management Structure</h3>
+                </header>
+                <div className="wizard-card-body wizard-card-body--stack">
+                  <ManagementSplit fields={activeFields} answers={answers} onChange={setValue} />
+                </div>
+              </article>
             ) : (
-              activeFields.map((field) => (
-                <FieldInput key={field.fieldKey} field={field} value={answers[field.fieldKey]} onChange={setValue} />
+              fieldGroups.map((group) => (
+                <article key={group.title} className="wizard-card">
+                  <header className="wizard-card-head">
+                    <h3>{group.title}</h3>
+                  </header>
+                  <div className="wizard-card-body">
+                    {group.fields.map((field) => (
+                      <div key={field.fieldKey} className={isWideField(field) ? 'wizard-grid-span' : undefined}>
+                        <FieldInput field={field} value={answers[field.fieldKey]} onChange={setValue} />
+                      </div>
+                    ))}
+                  </div>
+                </article>
               ))
             )}
-            {activeSection.sectionKey === 'kyc.docs' ? <DocumentsPanel draft={{ ...draft, answers }} /> : null}
+            {activeSection.sectionKey === 'kyc.docs' ? (
+              <article className="wizard-card">
+                <header className="wizard-card-head">
+                  <h3>Document uploads</h3>
+                </header>
+                <div className="wizard-card-body wizard-card-body--stack">
+                  <DocumentsPanel draft={{ ...draft, answers }} />
+                </div>
+              </article>
+            ) : null}
             {activeSection.sectionKey === 'rspolicy' ? (
               <p className="notice">
                 By completing this step you acknowledge the Responsible Sourcing Policy (version{' '}
-                {draft.policyVersion ?? draft.application.schemaVersion ?? 1}). Acknowledgement is recorded only when you
-                save this section.
+                {draft.policyVersion ?? draft.application.schemaVersion ?? 1}). Acknowledgement is recorded only when you save
+                this section.
               </p>
             ) : null}
-          </section>
+          </>
         ) : (
-          <section className="panel wizard-section-panel">
-            <h2>Review answers</h2>
-            <p className="notice">Check each section before submitting. Use Edit to return to a step.</p>
-            {sectionState.map((section) => {
-              const keys = new Set(section.fieldKeys);
-              const fields = draft.templates.flatMap((template) => template.fields.filter((field) => keys.has(field.fieldKey)));
-              return (
-                <article key={section.sectionKey} className="wizard-review-block">
-                  <header className="panel-head">
-                    <h3>{section.title}</h3>
-                    <button type="button" className="button-link button-link--outline" onClick={() => setActiveKey(section.sectionKey)}>
-                      Edit
-                    </button>
-                  </header>
-                  <p className={`wizard-status wizard-status--${section.status}`}>{statusLabel(section.status)}</p>
-                  <dl className="wizard-review-dl">
-                    {fields.slice(0, 8).map((field) => (
-                      <div key={field.fieldKey}>
-                        <dt>{field.label}</dt>
-                        <dd>{formatAnswer(answers[field.fieldKey])}</dd>
-                      </div>
-                    ))}
-                    {fields.length > 8 ? <p className="notice">{fields.length - 8} more fields in this section.</p> : null}
-                  </dl>
-                </article>
-              );
-            })}
-            {sectionState.every((section) => section.status === 'completed') ? (
-              <SubmitCase draft={{ ...draft, answers }} />
-            ) : (
-              <p className="notice">Complete every required section before submitting.</p>
-            )}
+          <section className="wizard-card">
+            <header className="wizard-card-head">
+              <h3>Review answers</h3>
+            </header>
+            <div className="wizard-card-body wizard-card-body--stack">
+              <p className="notice">Check each section before submitting. Use Edit to return to a step.</p>
+              {sectionState.map((section) => {
+                const keys = new Set(section.fieldKeys);
+                const fields = draft.templates.flatMap((template) =>
+                  template.fields.filter((field) => keys.has(field.fieldKey)),
+                );
+                return (
+                  <article key={section.sectionKey} className="wizard-review-block">
+                    <header className="panel-head">
+                      <h3>{section.title}</h3>
+                      <button
+                        type="button"
+                        className="button-link button-link--outline"
+                        onClick={() => setActiveKey(section.sectionKey)}
+                      >
+                        Edit
+                      </button>
+                    </header>
+                    <p className={`wizard-status wizard-status--${section.status}`}>{statusLabel(section.status)}</p>
+                    <dl className="wizard-review-dl">
+                      {fields.slice(0, 8).map((field) => (
+                        <div key={field.fieldKey}>
+                          <dt>{field.label}</dt>
+                          <dd>{formatAnswer(answers[field.fieldKey])}</dd>
+                        </div>
+                      ))}
+                      {fields.length > 8 ? <p className="notice">{fields.length - 8} more fields in this section.</p> : null}
+                    </dl>
+                  </article>
+                );
+              })}
+              {sectionState.every((section) => section.status === 'completed') ? (
+                <SubmitCase draft={{ ...draft, answers }} />
+              ) : (
+                <p className="notice">Complete every required section before submitting.</p>
+              )}
+            </div>
           </section>
         )}
+      </div>
 
-        <div className="wizard-actions">
-          <button type="button" className="button-link button-link--outline" onClick={goBack} disabled={!isReview && activeIndex <= 0}>
+      <footer className="wizard-footer">
+        <button type="button" className="wizard-btn-exit" onClick={() => void saveAndExit()} disabled={isReview}>
+          Save and exit
+        </button>
+        <div className="wizard-footer-nav">
+          <button type="button" className="wizard-btn-back" onClick={goBack} disabled={!isReview && activeIndex <= 0}>
             Back
           </button>
-          <button type="button" className="button-link button-link--outline" onClick={() => void saveAndExit()} disabled={isReview}>
-            Save and exit
-          </button>
           {!isReview ? (
-            <button type="button" onClick={() => void saveAndNext()}>
-              Save &amp; Next
+            <button type="button" className="wizard-btn-next" onClick={() => void saveAndNext()}>
+              Next
             </button>
           ) : null}
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
@@ -345,8 +420,8 @@ function RepeatingTable({
       {rows.map((row, index) => (
         <div key={index} className="wizard-repeat-row">
           {visibleColumns.map((column) => (
-            <label key={column.key}>
-              {column.label}
+            <label key={column.key} className="wizard-field">
+              <span className="wizard-field-label">{column.label}</span>
               <input
                 value={row[column.key] ?? ''}
                 onChange={(event) => {
@@ -358,7 +433,11 @@ function RepeatingTable({
               />
             </label>
           ))}
-          <button type="button" className="button-link button-link--outline" onClick={() => onChange(rows.filter((_, i) => i !== index))}>
+          <button
+            type="button"
+            className="button-link button-link--outline"
+            onClick={() => onChange(rows.filter((_, i) => i !== index))}
+          >
             Remove row
           </button>
         </div>
