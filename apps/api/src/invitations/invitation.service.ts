@@ -163,9 +163,7 @@ export class InvitationService {
       await tx.invitation.update({ where: { id: invitation.id }, data: { usedAt: new Date() } });
       return created;
     });
-    if (!current) {
-      await this.auth.startSession(user.id, invitation.tenantId, res);
-    }
+    await this.auth.startSession(user.id, invitation.tenantId, res);
     return { userId: user.id, tenantId: invitation.tenantId };
   }
 }

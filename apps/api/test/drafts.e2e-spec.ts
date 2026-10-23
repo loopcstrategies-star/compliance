@@ -9,6 +9,7 @@ import { SIGN_OUT_REQUIRED } from '../src/invitations/invitation.service';
 import { hashPassword } from '../src/auth/auth.service';
 import { encryptSecret } from '../src/crypto/secrets';
 import { ensureCatalogue } from '../src/seed/catalogue';
+import { SESSION_COOKIE } from '../src/domain';
 import { resetTenantData } from './reset-data';
 
 const PASSWORD = 'CorrectHorseBattery1';
@@ -81,7 +82,14 @@ describe('drafts and invitations', () => {
     expect(stillOpen.usedAt).toBeNull();
 
     const customer = request.agent(app.getHttpServer());
-    await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Local Metals' }).expect(201);
+    const accepted = await customer
+      .post('/invitations/accept')
+      .send({ token, password: PASSWORD, displayName: 'Local Metals' })
+      .expect(201);
+    expect(setCookieNames(accepted)).toContain(SESSION_COOKIE);
+    const me = await customer.get('/auth/me').expect(200);
+    expect(me.body.roles).toContain('customer');
+    expect(me.body.tenantId).toBe(tenantA.id);
     await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Local Metals' }).expect(400);
 
     const revoked = await employee
@@ -268,7 +276,11 @@ describe('drafts and invitations', () => {
     expect(await admin.user.count({ where: { email: 'fresh@example.com' } })).toBe(0);
 
     const customer = request.agent(app.getHttpServer());
-    await customer.post('/invitations/accept').send({ token }).expect(201);
+    const accepted = await customer.post('/invitations/accept').send({ token }).expect(201);
+    expect(setCookieNames(accepted)).toContain(SESSION_COOKIE);
+    const me = await customer.get('/auth/me').expect(200);
+    expect(me.body.roles).toEqual(expect.arrayContaining(['customer']));
+    expect(me.body.email).toBe('fresh@example.com');
     await customer.get('/applications/current').expect(200);
     await request(app.getHttpServer()).post('/invitations/accept').send({ token }).expect(400);
 
@@ -277,7 +289,8 @@ describe('drafts and invitations', () => {
       .send({ email: 'fresh@example.com', legalName: 'Fresh Metals', customerType: 'local_company' })
       .expect(201);
     const next = new URL(`http://localhost${again.body.acceptPath}`).searchParams.get('token');
-    await customer.post('/invitations/accept').send({ token: next }).expect(201);
+    const resumed = await customer.post('/invitations/accept').send({ token: next }).expect(201);
+    expect(setCookieNames(resumed)).toContain(SESSION_COOKIE);
     expect(await admin.user.count({ where: { email: 'fresh@example.com' } })).toBe(1);
     expect(await admin.application.count({ where: { customer: { user: { email: 'fresh@example.com' } } } })).toBe(1);
   });
@@ -291,6 +304,12 @@ describe('drafts and invitations', () => {
 
 
 });
+
+function setCookieNames(response: request.Response): string[] {
+  const header = response.headers['set-cookie'];
+  const values = Array.isArray(header) ? header : header ? [header] : [];
+  return values.map((entry) => String(entry).split('=')[0]?.trim()).filter(Boolean);
+}
 
 function vatField(body: { templates: { templateId: string; fields: { fieldKey: string; label: string; required: boolean }[] }[] }) {
   const kyc = body.templates.find((template) => template.templateId === 'kyc');
