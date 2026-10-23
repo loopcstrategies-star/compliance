@@ -71,54 +71,71 @@ export function CompanyAssetsForm({
   return (
     <div id="company-assets">
       <p className="notice">
-        Upload and save brand images for <strong>{tenantName}</strong> for this company&apos;s own document use. These uploads do not invite a customer. Accepted formats are JPG and PNG, up to 10 MB each. PDF files are not accepted here.
+        Upload and save brand images for <strong>{tenantName}</strong> for this company&apos;s own document use. These
+        uploads do not invite a customer. Accepted formats are JPG and PNG, up to 10 MB each. PDF files are not accepted
+        here.
       </p>
-      {!assetsLoaded ? <p className="notice error">Saved attachments could not be loaded. Uploading may require the latest API migration to be deployed.</p> : null}
-      {ASSET_FIELDS.map((field) => {
-        const saved = assetsByType.get(field.assetType);
-        const busy = pendingType === field.assetType;
-        return (
-          <article key={field.assetType} className="company-asset-card">
-            <div className="panel-head">
-              <div>
-                <h3>{field.title}</h3>
-                <p>{field.description}</p>
+      {!assetsLoaded ? (
+        <p className="notice error">
+          Saved attachments could not be loaded. Uploading may require the latest API migration to be deployed.
+        </p>
+      ) : null}
+      <div className="company-assets-grid">
+        {ASSET_FIELDS.map((field) => {
+          const saved = assetsByType.get(field.assetType);
+          const busy = pendingType === field.assetType;
+          return (
+            <article key={field.assetType} className="company-asset-card">
+              <div className="panel-head">
+                <div>
+                  <h3>{field.title}</h3>
+                  <p>{field.description}</p>
+                </div>
+                <span className={saved ? 'notice success' : 'notice'}>{saved ? 'Saved' : 'Not uploaded'}</span>
               </div>
-              <span className={saved ? 'notice success' : 'notice'}>{saved ? 'Saved' : 'Not uploaded'}</span>
-            </div>
-            {saved ? (
-              <div className="company-asset-saved">
-                <img
-                  src={`/api/tenants/${tenantId}/company-assets/${field.assetType}/content`}
-                  alt={`Saved ${field.title.toLowerCase()}`}
-                  width={160}
-                  height={100}
-                />
-                <p className="muted">
-                  {saved.mediaType.toUpperCase()} · {formatBytes(saved.byteSize)} · Saved {new Date(saved.uploadedAt).toLocaleString()}
-                </p>
-              </div>
-            ) : null}
-            <form onSubmit={(event) => void upload(event, field.assetType)}>
-              <label>
-                {saved ? 'Choose a replacement image' : 'Choose image'}
-                <input name="file" type="file" accept="image/jpeg,image/png" required />
-              </label>
-              {field.assetType === 'authorised_signature' ? (
-                <label className="company-asset-consent">
-                  <input name="authorisedUseConfirmed" type="checkbox" required />
-                  I confirm I am authorised to upload and use this person's signature image on company documents.
-                </label>
+              {saved ? (
+                <div className="company-asset-saved">
+                  <img
+                    src={`/api/tenants/${tenantId}/company-assets/${field.assetType}/content`}
+                    alt={`Saved ${field.title.toLowerCase()}`}
+                    width={160}
+                    height={100}
+                  />
+                  <p className="muted">
+                    {saved.mediaType.toUpperCase()} · {formatBytes(saved.byteSize)} · Saved{' '}
+                    {new Date(saved.uploadedAt).toLocaleString()}
+                  </p>
+                </div>
               ) : null}
-              <button type="submit" disabled={Boolean(pendingType)}>
-                {busy ? 'Uploading…' : saved ? 'Upload and replace' : 'Upload and save'}
-              </button>
-            </form>
-          </article>
-        );
-      })}
-      {error ? <p className="notice error" role="alert">{error}</p> : null}
-      {message ? <p className="notice success" role="status">{message}</p> : null}
+              <form onSubmit={(event) => void upload(event, field.assetType)}>
+                <label>
+                  {saved ? 'Choose a replacement image' : 'Choose image'}
+                  <input name="file" type="file" accept="image/jpeg,image/png" required />
+                </label>
+                {field.assetType === 'authorised_signature' ? (
+                  <label className="company-asset-consent">
+                    <input name="authorisedUseConfirmed" type="checkbox" required />
+                    I confirm I am authorised to upload and use this person&apos;s signature image on company documents.
+                  </label>
+                ) : null}
+                <button type="submit" disabled={Boolean(pendingType)}>
+                  {busy ? 'Uploading…' : saved ? 'Upload and replace' : 'Upload and save'}
+                </button>
+              </form>
+            </article>
+          );
+        })}
+      </div>
+      {error ? (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="notice success" role="status">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -35,10 +35,11 @@ export function CloneForm({ tenantId, tenantName }: { tenantId: string; tenantNa
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>Copy configuration</h2>
+    <form onSubmit={onSubmit} className="company-clone-form">
       <p className="notice">
-        This copies selected profile and template settings from {tenantName} onto a new company. Applications, files, signatures, users, sessions, reviews, and audit rows stay behind.
+        This creates another onboarding company by copying selected settings from <strong>{tenantName}</strong>. It is not
+        the customer-invitation action. Applications, files, signatures, users, sessions, reviews, and audit rows stay
+        behind.
       </p>
       <label>
         New company name
@@ -53,8 +54,16 @@ export function CloneForm({ tenantId, tenantName }: { tenantId: string; tenantNa
       <label>
         <input name="confirm" type="checkbox" value="yes" /> I confirm this copy
       </label>
-      {error ? <p className="notice error">{error}</p> : null}
-      {message ? <p className="notice success">{message}</p> : null}
+      {error ? (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="notice success" role="status">
+          {message}
+        </p>
+      ) : null}
       <button type="submit">Create company from this configuration</button>
     </form>
   );
