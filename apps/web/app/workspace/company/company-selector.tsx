@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 export function CompanySelector({
   companies,
   selectedId,
-  label = 'Active company',
+  label = 'Company',
+  basePath = '/workspace/company/branding',
 }: {
   companies: { id: string; name: string }[];
   selectedId?: string;
   label?: string;
+  basePath?: string;
 }) {
   const router = useRouter();
 
@@ -27,7 +29,7 @@ export function CompanySelector({
           if (!tenantId) {
             return;
           }
-          router.push(`/workspace/company?tenant=${encodeURIComponent(tenantId)}`);
+          router.push(`${basePath}?tenant=${encodeURIComponent(tenantId)}`);
         }}
       >
         {companies.map((company) => (
