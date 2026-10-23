@@ -5,6 +5,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { AuthState } from '../auth/auth.types';
 import { ensureFormCatalogue, FORM_SCHEMA_VERSION } from '../seed/form-catalogue';
 import { supersedeIfMaterial } from '../reviews/material-change';
+import {
+  WIZARD_SECTIONS,
+  fieldBelongsToSection,
+  keysForSection,
+  type SectionStatus,
+} from './wizard-sections';
 
 const TEMPLATE_TITLES: Record<string, string> = {
   kyc: 'Customer due diligence',
@@ -56,29 +62,131 @@ export class ApplicationService {
     await ensureFormCatalogue(this.prisma);
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await this.visible(tx, auth, id);
-      const allowed = await this.allowedKeys(tx, auth.tenantId, application.schemaVersion);
-      for (const [fieldKey, value] of Object.entries(answers)) {
-        const field = allowed.get(fieldKey);
-        if (!field) {
-          throw new BadRequestException('Unknown field');
-        }
-        if (field.repeatable && !Array.isArray(value)) {
-          throw new BadRequestException('Repeating answers must be a list');
-        }
-        await tx.answer.upsert({
-          where: { applicationId_fieldKey: { applicationId: application.id, fieldKey } },
-          create: {
-            tenantId: auth.tenantId,
-            applicationId: application.id,
-            fieldKey,
-            value: value as Prisma.InputJsonValue,
-          },
-          update: { value: value as Prisma.InputJsonValue },
-        });
-      }
+      await this.upsertAnswers(tx, auth.tenantId, application.id, application.schemaVersion, answers);
       await supersedeIfMaterial(tx, application);
       return this.present(tx, auth.tenantId, application.id, application.customer.customerType);
     });
+  }
+
+  async saveSection(
+    auth: AuthState,
+    id: string,
+    sectionKey: string,
+    answers: Record<string, unknown>,
+    markComplete = false,
+  ) {
+    await ensureFormCatalogue(this.prisma);
+    const section = WIZARD_SECTIONS.find((item) => item.sectionKey === sectionKey);
+    if (!section) {
+      throw new BadRequestException('Unknown section');
+    }
+    return this.prisma.withTenant(auth.tenantId, async (tx) => {
+      const application = await this.visible(tx, auth, id);
+      for (const fieldKey of Object.keys(answers)) {
+        if (!fieldBelongsToSection(fieldKey, section)) {
+          throw new BadRequestException('Field does not belong to this section');
+        }
+      }
+      await this.upsertAnswers(tx, auth.tenantId, application.id, application.schemaVersion, answers);
+      const status: SectionStatus = markComplete ? 'completed' : 'in_progress';
+      if (markComplete) {
+        await this.assertSectionComplete(tx, auth.tenantId, application, sectionKey, answers);
+      }
+      await tx.applicationSectionProgress.upsert({
+        where: {
+          applicationId_sectionKey: { applicationId: application.id, sectionKey },
+        },
+        create: {
+          tenantId: auth.tenantId,
+          applicationId: application.id,
+          sectionKey,
+          status,
+          schemaVersion: application.schemaVersion,
+          completedAt: markComplete ? new Date() : null,
+        },
+        update: {
+          status,
+          schemaVersion: application.schemaVersion,
+          completedAt: markComplete ? new Date() : null,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          tenantId: auth.tenantId,
+          actorId: auth.userId,
+          action: markComplete ? 'application.section.completed' : 'application.section.saved',
+          targetType: 'application_section',
+          targetId: application.id,
+          purpose: sectionKey,
+        },
+      });
+      await supersedeIfMaterial(tx, application);
+      return this.present(tx, auth.tenantId, application.id, application.customer.customerType);
+    });
+  }
+
+  private async upsertAnswers(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    applicationId: string,
+    schemaVersion: number,
+    answers: Record<string, unknown>,
+  ) {
+    const allowed = await this.allowedKeys(tx, tenantId, schemaVersion);
+    for (const [fieldKey, value] of Object.entries(answers)) {
+      const field = allowed.get(fieldKey);
+      if (!field) {
+        throw new BadRequestException('Unknown field');
+      }
+      if (field.repeatable && !Array.isArray(value)) {
+        throw new BadRequestException('Repeating answers must be a list');
+      }
+      await tx.answer.upsert({
+        where: { applicationId_fieldKey: { applicationId, fieldKey } },
+        create: {
+          tenantId,
+          applicationId,
+          fieldKey,
+          value: value as Prisma.InputJsonValue,
+        },
+        update: { value: value as Prisma.InputJsonValue },
+      });
+    }
+  }
+
+  private async assertSectionComplete(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    application: { id: string; schemaVersion: number; customer: { customerType: string } },
+    sectionKey: string,
+    incoming: Record<string, unknown>,
+  ) {
+    const presented = await this.present(tx, tenantId, application.id, application.customer.customerType);
+    const merged = { ...presented.answers, ...incoming };
+    const sectionFields = presented.templates
+      .flatMap((template) => template.fields)
+      .filter((field) => keysForSection(sectionKey, [field.fieldKey]).length > 0);
+    const missing: string[] = [];
+    for (const field of sectionFields) {
+      if (!field.required) {
+        continue;
+      }
+      if (!isAnswered(merged[field.fieldKey], field.widget)) {
+        missing.push(field.fieldKey);
+      }
+    }
+    if (sectionKey === 'rspolicy') {
+      if (merged['rspolicy.ack.accepted'] !== true) {
+        missing.push('rspolicy.ack.accepted');
+      }
+      const version = merged['rspolicy.ack.policy_version'];
+      if (typeof version !== 'string' || !version.trim()) {
+        missing.push('rspolicy.ack.policy_version');
+      }
+    }
+    if (missing.length > 0) {
+      throw new BadRequestException({ message: 'Section is incomplete', missingAnswers: missing });
+    }
   }
 
   private async visible(
@@ -135,15 +243,13 @@ export class ApplicationService {
     for (const answer of application.answers) {
       answers[answer.fieldKey] = answer.value;
     }
-    return {
-      application: {
-        id: application.id,
-        status: application.status,
-        documentVersion: application.documentVersion,
-        schemaVersion: application.schemaVersion,
-        customerType,
-      },
-      templates: (await Promise.all(schemas.map(async (schema) => {
+    const progressRows = await tx.applicationSectionProgress.findMany({
+      where: { applicationId, tenantId },
+    });
+    const progressByKey = new Map(progressRows.map((row) => [row.sectionKey, row]));
+    const templates = (
+      await Promise.all(
+        schemas.map(async (schema) => {
           if (!(await isTemplateRequired(tx, tenantId, customerType, schema.templateId))) {
             return null;
           }
@@ -166,13 +272,87 @@ export class ApplicationService {
               };
             }),
           };
-        }))).filter((template) => template !== null),
+        }),
+      )
+    ).filter((template) => template !== null);
+
+    const allFieldKeys = templates.flatMap((template) => template.fields.map((field) => field.fieldKey));
+    const sections = WIZARD_SECTIONS.map((def) => {
+      const row = progressByKey.get(def.sectionKey);
+      const sectionKeys = keysForSection(def.sectionKey, allFieldKeys);
+      const applicable = sectionKeys.length > 0;
+      let status: SectionStatus = (row?.status as SectionStatus) ?? 'not_started';
+      if (!applicable) {
+        status = 'completed';
+      } else if (!row && sectionKeys.some((key) => answers[key] !== undefined)) {
+        status = 'in_progress';
+      }
+      return {
+        sectionKey: def.sectionKey,
+        title: def.title,
+        status,
+        completedAt: row?.completedAt ?? null,
+        applicable,
+        fieldKeys: sectionKeys,
+      };
+    });
+    const resumeSectionKey =
+      sections.find((section) => section.applicable && section.status !== 'completed')?.sectionKey ??
+      sections[0]?.sectionKey ??
+      null;
+
+    return {
+      application: {
+        id: application.id,
+        status: application.status,
+        documentVersion: application.documentVersion,
+        schemaVersion: application.schemaVersion,
+        customerType,
+      },
+      templates,
       extras: extras.map((extra) => ({
         id: extra.id,
         label: extra.label,
         fieldKey: `extra.${extra.id}`,
       })),
       answers,
+      sections,
+      resumeSectionKey,
+      policyVersion: String(FORM_SCHEMA_VERSION),
     };
   }
+}
+
+function isAnswered(value: unknown, widget: string): boolean {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  if (typeof value === 'boolean') {
+    return widget === 'declaration' ? value === true : true;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (widget === 'yes_no_details' || widget === 'yes_no_comments' || widget === 'duration_comments') {
+      const answer = record.answer ?? record.value ?? record.choice;
+      if (typeof answer !== 'string' || !answer.trim()) {
+        return false;
+      }
+      return true;
+    }
+    if (widget === 'declaration') {
+      return record.accepted === true || record.value === true;
+    }
+    if (widget === 'single_choice' || widget === 'yes_no') {
+      const choice = record.value ?? record.choice ?? record.answer;
+      return typeof choice === 'string' ? choice.trim().length > 0 : Boolean(choice);
+    }
+    return Object.keys(record).length > 0;
+  }
+  return true;
 }

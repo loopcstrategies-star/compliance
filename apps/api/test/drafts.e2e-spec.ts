@@ -122,6 +122,9 @@ describe('drafts and invitations', () => {
     const local = await login('local@example.com');
     const own = await local.get('/applications/current').expect(200);
     expect(own.body.application.customerType).toBe('local_company');
+    expect(Array.isArray(own.body.sections)).toBe(true);
+    expect(own.body.resumeSectionKey).toBeTruthy();
+    expect(own.body.policyVersion).toBeTruthy();
 
     const employeeB = await login('employee-b@example.com');
     const foreignInvite = await employeeB
@@ -143,6 +146,10 @@ describe('drafts and invitations', () => {
       .send({ answers: { 'kyc.entity.name': 'Taken' } })
       .expect(404);
     expect(denied.body.message).toBe('Not found');
+    await foreign
+      .put(`/applications/${own.body.application.id}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Taken' } })
+      .expect(404);
 
     await local
       .put(`/applications/${own.body.application.id}/answers`)
@@ -155,6 +162,101 @@ describe('drafts and invitations', () => {
     expect(saved.body.answers['kyc.entity.name']).toBe('Local Metals LLC');
     const reloaded = await local.get('/applications/current').expect(200);
     expect(reloaded.body.answers['kyc.entity.name']).toBe('Local Metals LLC');
+  });
+
+  it('saves wizard sections, resumes incomplete steps, and keeps pep steps independent', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'wizard@example.com', legalName: 'Wizard Metals', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Wizard Metals' }).expect(201);
+
+    const draft = await customer.get('/applications/current').expect(200);
+    const applicationId = draft.body.application.id as string;
+    expect(draft.body.resumeSectionKey).toBe('kyc.entity');
+
+    await customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.pep.a': { answer: 'no' } } })
+      .expect(400);
+
+    const inProgress = await customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Wizard Metals LLC' }, markComplete: false })
+      .expect(200);
+    const entityProgress = inProgress.body.sections.find((section: { sectionKey: string }) => section.sectionKey === 'kyc.entity');
+    expect(entityProgress.status).toBe('in_progress');
+    expect(inProgress.body.answers['kyc.entity.name']).toBe('Wizard Metals LLC');
+
+    const incomplete = await customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Wizard Metals LLC' }, markComplete: true })
+      .expect(400);
+    expect(incomplete.body.missingAnswers?.length).toBeGreaterThan(0);
+
+    const pepStep = await customer
+      .put(`/applications/${applicationId}/sections/kyc.pep`)
+      .send({
+        answers: {
+          'kyc.pep.a': { answer: 'no', details: '' },
+          'kyc.pep.b': { answer: 'no', details: '' },
+        },
+        markComplete: true,
+      })
+      .expect(200);
+    expect(pepStep.body.sections.find((section: { sectionKey: string }) => section.sectionKey === 'kyc.pep').status).toBe(
+      'completed',
+    );
+    expect(pepStep.body.sections.find((section: { sectionKey: string }) => section.sectionKey === 'pepquest').status).not.toBe(
+      'completed',
+    );
+
+    const policyDenied = await customer
+      .put(`/applications/${applicationId}/sections/rspolicy`)
+      .send({
+        answers: {
+          'rspolicy.ack.name': 'Wizard Contact',
+          'rspolicy.ack.signature': 'sig-file-id',
+          'rspolicy.ack.stamp': 'stamp-file-id',
+        },
+        markComplete: true,
+      })
+      .expect(400);
+    expect(policyDenied.body.missingAnswers).toEqual(
+      expect.arrayContaining(['rspolicy.ack.accepted', 'rspolicy.ack.policy_version']),
+    );
+
+    const policyOk = await customer
+      .put(`/applications/${applicationId}/sections/rspolicy`)
+      .send({
+        answers: {
+          'rspolicy.ack.accepted': true,
+          'rspolicy.ack.name': 'Wizard Contact',
+          'rspolicy.ack.signature': 'sig-file-id',
+          'rspolicy.ack.stamp': 'stamp-file-id',
+          'rspolicy.ack.policy_version': String(draft.body.policyVersion),
+        },
+        markComplete: true,
+      })
+      .expect(200);
+    expect(policyOk.body.answers['rspolicy.ack.policy_version']).toBe(String(draft.body.policyVersion));
+    expect(policyOk.body.answers['rspolicy.ack.accepted']).toBe(true);
+
+    const resumed = await customer.get('/applications/current').expect(200);
+    expect(resumed.body.resumeSectionKey).toBe('kyc.entity');
+    expect(resumed.body.answers['kyc.entity.name']).toBe('Wizard Metals LLC');
+    expect(resumed.body.answers['kyc.pep.a']).toEqual({ answer: 'no', details: '' });
+
+    const progressCount = await admin.applicationSectionProgress.count({ where: { applicationId } });
+    expect(progressCount).toBeGreaterThanOrEqual(2);
+    expect(progressCount).toBe(
+      await admin.applicationSectionProgress.count({
+        where: { applicationId },
+      }),
+    );
   });
 
   it('requires the domestic VAT row only for a local company and keeps the source label', async () => {

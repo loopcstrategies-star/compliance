@@ -1,9 +1,8 @@
 import { requireArea } from '../../lib/session';
 import { apiGet } from '../../lib/api';
 import { Shell } from '../shell';
-import { DraftForm, type Draft } from './draft-form';
-import { DocumentsPanel } from './documents-panel';
-import { SubmitCase } from './submit-case';
+import { OnboardingWizard } from './wizard/onboarding-wizard';
+import type { Draft } from './wizard/types';
 
 export default async function PortalPage() {
   const me = await requireArea(['customer']);
@@ -12,17 +11,11 @@ export default async function PortalPage() {
     <Shell title="Customer portal" me={me}>
       {draft ? (
         <>
-          <ol className="stepper">
-            <li>Company details</li>
-            <li>Documents</li>
-            <li>Submit</li>
-          </ol>
           <p className="notice">
-            {draft.application.customerType.replaceAll('_', ' ')} · {draft.application.status.replaceAll('_', ' ')} · version {draft.application.documentVersion}
+            {draft.application.customerType.replaceAll('_', ' ')} · {draft.application.status.replaceAll('_', ' ')} ·
+            version {draft.application.documentVersion}
           </p>
-          <DraftForm draft={draft} />
-          <DocumentsPanel draft={draft} />
-          <SubmitCase draft={draft} />
+          <OnboardingWizard draft={draft} />
         </>
       ) : (
         <p className="notice">No onboarding draft is available for this account.</p>

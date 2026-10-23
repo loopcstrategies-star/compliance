@@ -41,6 +41,7 @@ model Tenant {
   deletionRequests DeletionRequest[]
   companyKycProfile CompanyKycProfile?
   companyAssets TenantCompanyAsset[]
+  sectionProgress ApplicationSectionProgress[]
 
   @@map("tenants")
 }
@@ -289,9 +290,29 @@ model Application {
   generatedPackages GeneratedPackage[]
   submissions   Submission[]
   deliveries    Delivery[]
+  sectionProgress ApplicationSectionProgress[]
 
   @@index([tenantId])
   @@map("applications")
+}
+
+model ApplicationSectionProgress {
+  id            String      @id @default(uuid()) @db.Uuid
+  tenantId      String      @map("tenant_id") @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  sectionKey    String      @map("section_key")
+  status        String      @default("not_started")
+  schemaVersion Int         @map("schema_version")
+  completedAt   DateTime?   @map("completed_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  @@unique([applicationId, sectionKey])
+  @@index([tenantId])
+  @@index([applicationId])
+  @@map("application_section_progress")
 }
 
 model Answer {

@@ -287,9 +287,16 @@ const PEP_QUESTIONNAIRE_FIELDS: FieldSeed[] = [
 ];
 
 const POLICY_FIELDS: FieldSeed[] = [
+  {
+    fieldKey: 'rspolicy.ack.accepted',
+    label:
+      'I acknowledge that I have read and understood the Responsible Sourcing Policy and agree to comply with its requirements.',
+    widget: 'declaration',
+  },
   text('rspolicy.ack.name', 'Name'),
   text('rspolicy.ack.signature', 'Signature'),
   text('rspolicy.ack.stamp', 'Stamp'),
+  text('rspolicy.ack.policy_version', 'Policy document version acknowledged'),
 ];
 
 const FIELDS: Record<(typeof TEMPLATES)[number], FieldSeed[]> = {
@@ -301,13 +308,61 @@ const FIELDS: Record<(typeof TEMPLATES)[number], FieldSeed[]> = {
 
 export async function ensureFormCatalogue(prisma: PrismaClient): Promise<void> {
   const existing = await prisma.formSchema.count();
-  if (existing > 0) {
-    return;
+  if (existing === 0) {
+    for (const templateId of TEMPLATES) {
+      const schema = await prisma.formSchema.create({ data: { templateId, version: SCHEMA_VERSION } });
+      let sortOrder = 0;
+      for (const field of FIELDS[templateId]) {
+        await prisma.formField.create({
+          data: {
+            schemaId: schema.id,
+            fieldKey: field.fieldKey,
+            label: field.label,
+            widget: field.widget,
+            repeatable: field.repeatable ?? false,
+            options: field.options ?? undefined,
+            columns: (field.columns as Prisma.InputJsonValue | undefined) ?? undefined,
+            sortOrder,
+          },
+        });
+        sortOrder += 1;
+      }
+    }
+    for (const customerType of CUSTOMER_TYPES) {
+      for (const templateId of TEMPLATES) {
+        await prisma.applicabilityRule.create({
+          data: { customerType, templateId, fieldKey: '', required: true },
+        });
+      }
+      await prisma.applicabilityRule.create({
+        data: {
+          customerType,
+          templateId: 'kyc',
+          fieldKey: 'kyc.docs.12',
+          required: customerType === 'local_company',
+        },
+      });
+    }
   }
+  await ensureMissingFormFields(prisma);
+}
+
+/** Idempotently add catalogue fields introduced after initial seed (e.g. policy version). */
+async function ensureMissingFormFields(prisma: PrismaClient): Promise<void> {
   for (const templateId of TEMPLATES) {
-    const schema = await prisma.formSchema.create({ data: { templateId, version: SCHEMA_VERSION } });
-    let sortOrder = 0;
+    const schema = await prisma.formSchema.findUnique({
+      where: { templateId_version: { templateId, version: SCHEMA_VERSION } },
+      include: { fields: { select: { fieldKey: true, sortOrder: true } } },
+    });
+    if (!schema) {
+      continue;
+    }
+    const have = new Set(schema.fields.map((field) => field.fieldKey));
+    let sortOrder = schema.fields.reduce((max, field) => Math.max(max, field.sortOrder), -1) + 1;
     for (const field of FIELDS[templateId]) {
+      if (have.has(field.fieldKey)) {
+        continue;
+      }
       await prisma.formField.create({
         data: {
           schemaId: schema.id,
@@ -322,21 +377,6 @@ export async function ensureFormCatalogue(prisma: PrismaClient): Promise<void> {
       });
       sortOrder += 1;
     }
-  }
-  for (const customerType of CUSTOMER_TYPES) {
-    for (const templateId of TEMPLATES) {
-      await prisma.applicabilityRule.create({
-        data: { customerType, templateId, fieldKey: '', required: true },
-      });
-    }
-    await prisma.applicabilityRule.create({
-      data: {
-        customerType,
-        templateId: 'kyc',
-        fieldKey: 'kyc.docs.12',
-        required: customerType === 'local_company',
-      },
-    });
   }
 }
 

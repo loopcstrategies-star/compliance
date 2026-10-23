@@ -31,4 +31,18 @@ export class ApplicationController {
     }
     return this.applications.save(req.auth!, id, body.answers);
   }
+
+  @Put(':id/sections/:sectionKey')
+  @RequirePermissions('application.write')
+  saveSection(
+    @Param('id') id: string,
+    @Param('sectionKey') sectionKey: string,
+    @Body() body: { answers?: Record<string, unknown>; markComplete?: boolean },
+    @Req() req: AuthedRequest,
+  ) {
+    if (!body?.answers || typeof body.answers !== 'object' || Array.isArray(body.answers)) {
+      throw new BadRequestException('Answers are required');
+    }
+    return this.applications.saveSection(req.auth!, id, sectionKey, body.answers, body.markComplete === true);
+  }
 }
