@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DocumentsPanel } from '../documents-panel';
 import { SubmitCase } from '../submit-case';
 import { FieldInput } from './field-input';
@@ -10,6 +11,7 @@ import type { Draft, Field, SectionProgress } from './types';
 const REVIEW_KEY = 'review';
 
 export function OnboardingWizard({ draft }: { draft: Draft }) {
+  const router = useRouter();
   const sections = useMemo(
     () => (draft.sections ?? []).filter((section) => section.applicable !== false),
     [draft.sections],
@@ -23,12 +25,17 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answersRef = useRef(answers);
   answersRef.current = answers;
+  const saveGenerationRef = useRef(0);
+  const inflightRef = useRef<Promise<boolean> | null>(null);
+  const activeSectionRef = useRef<SectionProgress | undefined>(undefined);
 
   const activeIndex = sections.findIndex((section) => section.sectionKey === activeKey);
   const isReview = activeKey === REVIEW_KEY;
   const activeSection = sections[activeIndex];
+  activeSectionRef.current = activeSection;
   const totalSteps = sections.length;
   const stepNumber = isReview ? totalSteps + 1 : Math.max(1, activeIndex + 1);
+  const incompleteSections = sectionState.filter((section) => section.status !== 'completed').map((section) => section.title);
 
   const activeFields = useMemo(() => {
     if (!activeSection) {
@@ -63,15 +70,21 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
     setClientError('');
   }
 
-  function scheduleAutosave(nextAnswers: Record<string, unknown>) {
-    if (!activeSection || isReview) {
-      return;
-    }
+  function clearDebounce() {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
+  }
+
+  function scheduleAutosave(nextAnswers: Record<string, unknown>) {
+    const section = activeSectionRef.current;
+    if (!section || activeKey === REVIEW_KEY) {
+      return;
+    }
+    clearDebounce();
     debounceRef.current = setTimeout(() => {
-      void persistSection(activeSection.sectionKey, nextAnswers, false);
+      void persistSection(section.sectionKey, nextAnswers, false);
     }, 800);
   }
 
@@ -87,30 +100,58 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
         bodyAnswers[key] = payloadAnswers[key];
       }
     }
+    const generation = ++saveGenerationRef.current;
     setSaveState('saving');
     setError('');
-    const response = await fetch(`/api/applications/${draft.application.id}/sections/${encodeURIComponent(sectionKey)}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ answers: bodyAnswers, markComplete }),
-    });
-    if (!response.ok) {
-      const detail = (await response.json().catch(() => null)) as { message?: string; missingAnswers?: string[] } | null;
-      setSaveState('error');
-      setError(
-        detail?.missingAnswers?.length
-          ? `Complete required fields before continuing: ${detail.missingAnswers.join(', ')}`
-          : detail?.message || 'The section could not be saved. Your answers are still on this page — try again.',
-      );
-      return false;
+    const run = (async () => {
+      const response = await fetch(`/api/applications/${draft.application.id}/sections/${encodeURIComponent(sectionKey)}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ answers: bodyAnswers, markComplete }),
+      });
+      if (!response.ok) {
+        if (generation === saveGenerationRef.current) {
+          const detail = (await response.json().catch(() => null)) as { message?: string; missingAnswers?: string[] } | null;
+          setSaveState('error');
+          setError(
+            detail?.missingAnswers?.length
+              ? `Complete required fields before continuing: ${detail.missingAnswers.join(', ')}`
+              : detail?.message || 'The section could not be saved. Your answers are still on this page — try again.',
+          );
+        }
+        return false;
+      }
+      const body = (await response.json()) as Draft;
+      if (generation !== saveGenerationRef.current) {
+        return true;
+      }
+      setAnswers(body.answers);
+      if (body.sections) {
+        setSectionState(body.sections.filter((item) => item.applicable !== false));
+      }
+      setSaveState('saved');
+      return true;
+    })();
+    inflightRef.current = run;
+    try {
+      return await run;
+    } finally {
+      if (inflightRef.current === run) {
+        inflightRef.current = null;
+      }
     }
-    const body = (await response.json()) as Draft;
-    setAnswers(body.answers);
-    if (body.sections) {
-      setSectionState(body.sections.filter((item) => item.applicable !== false));
+  }
+
+  async function flushPending(markComplete: boolean) {
+    clearDebounce();
+    if (inflightRef.current) {
+      await inflightRef.current;
     }
-    setSaveState('saved');
-    return true;
+    const section = activeSectionRef.current;
+    if (!section || activeKey === REVIEW_KEY) {
+      return true;
+    }
+    return persistSection(section.sectionKey, answersRef.current, markComplete);
   }
 
   function validateLocal(fields: Field[], current: Record<string, unknown>): string | null {
@@ -139,6 +180,10 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
       setClientError(localError);
       return;
     }
+    clearDebounce();
+    if (inflightRef.current) {
+      await inflightRef.current;
+    }
     const ok = await persistSection(activeSection.sectionKey, answersRef.current, true);
     if (!ok) {
       return;
@@ -149,12 +194,18 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
   }
 
   async function saveAndExit() {
-    if (activeSection) {
-      await persistSection(activeSection.sectionKey, answersRef.current, false);
+    const ok = await flushPending(false);
+    if (!ok) {
+      return;
     }
+    router.push('/portal/saved');
   }
 
-  function goBack() {
+  async function goBack() {
+    const ok = await flushPending(false);
+    if (!ok) {
+      return;
+    }
     if (isReview) {
       setActiveKey(sections[sections.length - 1]?.sectionKey ?? sections[0]?.sectionKey);
       return;
@@ -162,6 +213,17 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
     if (activeIndex > 0) {
       setActiveKey(sections[activeIndex - 1].sectionKey);
     }
+  }
+
+  async function goToSection(sectionKey: string) {
+    if (sectionKey === activeKey) {
+      return;
+    }
+    const ok = await flushPending(false);
+    if (!ok) {
+      return;
+    }
+    setActiveKey(sectionKey);
   }
 
   const saveLabel =
@@ -204,7 +266,7 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
                 <button
                   type="button"
                   className={[active ? 'is-active' : '', completed ? 'is-completed' : ''].filter(Boolean).join(' ') || undefined}
-                  onClick={() => setActiveKey(section.sectionKey)}
+                  onClick={() => void goToSection(section.sectionKey)}
                   aria-current={active ? 'step' : undefined}
                 >
                   <span className="wizard-step-num" aria-hidden="true">
@@ -220,7 +282,7 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
             <button
               type="button"
               className={isReview ? 'is-active' : undefined}
-              onClick={() => setActiveKey(REVIEW_KEY)}
+              onClick={() => void goToSection(REVIEW_KEY)}
               aria-current={isReview ? 'step' : undefined}
             >
               <span className="wizard-step-num" aria-hidden="true">
@@ -314,7 +376,7 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
                       <button
                         type="button"
                         className="button-link button-link--outline"
-                        onClick={() => setActiveKey(section.sectionKey)}
+                        onClick={() => void goToSection(section.sectionKey)}
                       >
                         Edit
                       </button>
@@ -332,11 +394,7 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
                   </article>
                 );
               })}
-              {sectionState.every((section) => section.status === 'completed') ? (
-                <SubmitCase draft={{ ...draft, answers }} />
-              ) : (
-                <p className="notice">Complete every required section before submitting.</p>
-              )}
+              <SubmitCase draft={{ ...draft, answers }} incompleteSections={incompleteSections} />
             </div>
           </section>
         )}
@@ -347,7 +405,12 @@ export function OnboardingWizard({ draft }: { draft: Draft }) {
           Save and exit
         </button>
         <div className="wizard-footer-nav">
-          <button type="button" className="wizard-btn-back" onClick={goBack} disabled={!isReview && activeIndex <= 0}>
+          <button
+            type="button"
+            className="wizard-btn-back"
+            onClick={() => void goBack()}
+            disabled={!isReview && activeIndex <= 0}
+          >
             Back
           </button>
           {!isReview ? (

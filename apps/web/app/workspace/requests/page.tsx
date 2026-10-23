@@ -1,9 +1,9 @@
 import { requireArea } from '../../../lib/session';
 import { InviteForm } from '../../invite-form';
 import { ResumeForm } from '../resume-form';
-import { QueueTable } from '../queue';
 import { TenantPicker } from '../tenant-picker';
 import { loadBoard, resolveTenant } from '../load-board';
+import { SubmittedApplicationsTable } from '../submitted-applications-table';
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const me = await requireArea(['employee', 'maker', 'checker', 'authorised_approver', 'super_admin']);
@@ -27,7 +27,16 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         </>
       ) : null}
       {board ? (
-        <QueueTable items={board.items} tenantId={tenantId} empty="No submitted requests are waiting for a first review." />
+        <SubmittedApplicationsTable
+          tenantId={boardTenant}
+          items={board.items.map((item) => ({
+            id: item.id,
+            status: item.status,
+            legalName: item.legalName,
+            customerType: item.customerType,
+            submittedAt: (item as { submittedAt?: string | null }).submittedAt ?? null,
+          }))}
+        />
       ) : (
         <p className="notice error">The request list could not be loaded.</p>
       )}

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { isTemplateRequired } from '../documents/applicability';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +19,8 @@ const TEMPLATE_TITLES: Record<string, string> = {
   'responsible-sourcing': 'Responsible sourcing acknowledgement',
 };
 
+const EDITABLE_STATUSES = new Set(['draft', 'correction']);
+
 @Injectable()
 export class ApplicationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,9 +35,19 @@ export class ApplicationService {
         throw new NotFoundException('Not found');
       }
       let application = await tx.application.findFirst({
-        where: { tenantId: auth.tenantId, customerId: customer.id },
-        orderBy: { createdAt: 'asc' },
+        where: {
+          tenantId: auth.tenantId,
+          customerId: customer.id,
+          status: { in: [...EDITABLE_STATUSES] },
+        },
+        orderBy: { createdAt: 'desc' },
       });
+      if (!application) {
+        application = await tx.application.findFirst({
+          where: { tenantId: auth.tenantId, customerId: customer.id },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
       if (!application) {
         application = await tx.application.create({
           data: {
@@ -62,6 +74,7 @@ export class ApplicationService {
     await ensureFormCatalogue(this.prisma);
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await this.visible(tx, auth, id);
+      this.assertEditable(application.status);
       await this.upsertAnswers(tx, auth.tenantId, application.id, application.schemaVersion, answers);
       await supersedeIfMaterial(tx, application);
       return this.present(tx, auth.tenantId, application.id, application.customer.customerType);
@@ -82,16 +95,26 @@ export class ApplicationService {
     }
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await this.visible(tx, auth, id);
+      this.assertEditable(application.status);
       for (const fieldKey of Object.keys(answers)) {
         if (!fieldBelongsToSection(fieldKey, section)) {
           throw new BadRequestException('Field does not belong to this section');
         }
       }
       await this.upsertAnswers(tx, auth.tenantId, application.id, application.schemaVersion, answers);
-      const status: SectionStatus = markComplete ? 'completed' : 'in_progress';
+      const existing = await tx.applicationSectionProgress.findUnique({
+        where: { applicationId_sectionKey: { applicationId: application.id, sectionKey } },
+      });
       if (markComplete) {
         await this.assertSectionComplete(tx, auth.tenantId, application, sectionKey, answers);
       }
+      const status: SectionStatus = markComplete
+        ? 'completed'
+        : existing?.status === 'completed'
+          ? 'completed'
+          : 'in_progress';
+      const completedAt =
+        status === 'completed' ? (markComplete ? new Date() : existing?.completedAt ?? new Date()) : null;
       await tx.applicationSectionProgress.upsert({
         where: {
           applicationId_sectionKey: { applicationId: application.id, sectionKey },
@@ -102,12 +125,12 @@ export class ApplicationService {
           sectionKey,
           status,
           schemaVersion: application.schemaVersion,
-          completedAt: markComplete ? new Date() : null,
+          completedAt,
         },
         update: {
           status,
           schemaVersion: application.schemaVersion,
-          completedAt: markComplete ? new Date() : null,
+          completedAt,
         },
       });
       await tx.auditEvent.create({
@@ -189,6 +212,12 @@ export class ApplicationService {
     }
   }
 
+  private assertEditable(status: string) {
+    if (!EDITABLE_STATUSES.has(status)) {
+      throw new ConflictException('This application can no longer be edited');
+    }
+  }
+
   private async visible(
     tx: Prisma.TransactionClient,
     auth: AuthState,
@@ -227,7 +256,15 @@ export class ApplicationService {
   ) {
     const application = await tx.application.findFirstOrThrow({
       where: { id: applicationId, tenantId },
-      include: { answers: true },
+      include: {
+        answers: true,
+        submissions: {
+          where: { supersededAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
+      },
     });
     const schemas = await tx.formSchema.findMany({
       where: { version: application.schemaVersion },
@@ -301,6 +338,9 @@ export class ApplicationService {
       sections[0]?.sectionKey ??
       null;
 
+    const editable = EDITABLE_STATUSES.has(application.status);
+    const submittedAt = application.submissions[0]?.createdAt ?? null;
+
     return {
       application: {
         id: application.id,
@@ -319,6 +359,8 @@ export class ApplicationService {
       sections,
       resumeSectionKey,
       policyVersion: String(FORM_SCHEMA_VERSION),
+      editable,
+      submittedAt,
     };
   }
 }

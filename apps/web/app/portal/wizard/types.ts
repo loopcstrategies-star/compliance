@@ -33,4 +33,6 @@ export type Draft = {
   sections?: SectionProgress[];
   resumeSectionKey?: string | null;
   policyVersion?: string;
+  editable?: boolean;
+  submittedAt?: string | null;
 };

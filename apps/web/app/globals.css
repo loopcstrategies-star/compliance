@@ -1430,3 +1430,62 @@ table.queue th {
     position: static;
   }
 }
+
+.portal-status-panel h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.45rem;
+  color: var(--navy);
+}
+
+.portal-status-dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.portal-status-dl > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.portal-status-dl dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.portal-status-dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.wizard-submit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.submitted-apps-head {
+  align-items: baseline;
+}
+
+.submitted-apps-head .notice {
+  margin: 0;
+}
+
+.submitted-apps-table-wrap {
+  overflow-x: auto;
+}
+
+.submitted-app-id {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.85rem;
+  margin-right: 0.4rem;
+}
+
+.submitted-copy {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
