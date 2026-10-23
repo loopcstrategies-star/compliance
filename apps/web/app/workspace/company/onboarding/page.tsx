@@ -34,7 +34,6 @@ export default async function CompanyOnboardingPage({
       </header>
 
       <section className="panel">
-        <h3>Create onboarding company</h3>
         {justCreated && selected ? (
           <div className="notice success company-created-banner" role="status">
             <p>Company created successfully.</p>
