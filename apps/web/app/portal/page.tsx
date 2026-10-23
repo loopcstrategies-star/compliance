@@ -10,13 +10,7 @@ export default async function PortalPage() {
   return (
     <Shell title="Customer portal" me={me}>
       {draft ? (
-        <>
-          <p className="notice">
-            {draft.application.customerType.replaceAll('_', ' ')} · {draft.application.status.replaceAll('_', ' ')} ·
-            version {draft.application.documentVersion}
-          </p>
-          <OnboardingWizard draft={draft} />
-        </>
+        <OnboardingWizard draft={draft} />
       ) : (
         <p className="notice">No onboarding draft is available for this account.</p>
       )}
