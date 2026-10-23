@@ -19,13 +19,9 @@ const ASSET_FIELDS: { assetType: AssetType; title: string }[] = [
 ];
 
 export function CompanyAssetsForm({
-  tenantId,
-  tenantName,
   initialAssets,
   assetsLoaded,
 }: {
-  tenantId: string;
-  tenantName: string;
   initialAssets: CompanyAssetSummary[];
   assetsLoaded: boolean;
 }) {
@@ -48,7 +44,7 @@ export function CompanyAssetsForm({
 
     setPendingType(assetType);
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/company-assets`, {
+      const response = await fetch('/api/platform/company-assets', {
         method: 'POST',
         body: form,
       });
@@ -59,7 +55,7 @@ export function CompanyAssetsForm({
       }
       const saved = (await response.json()) as CompanyAssetSummary;
       setAssets((current) => [...current.filter((item) => item.assetType !== saved.assetType), saved]);
-      setMessage(`${labelFor(assetType)} uploaded and saved for ${tenantName}.`);
+      setMessage(`${labelFor(assetType)} uploaded and saved.`);
       formElement.reset();
     } catch {
       setError('The upload could not reach the server. Check your connection and try again.');
@@ -81,14 +77,14 @@ export function CompanyAssetsForm({
           const busy = pendingType === field.assetType;
           return (
             <article key={field.assetType} className="company-asset-card">
-              <div className="panel-head">
+              <div className="panel-head company-asset-card-head">
                 <h3>{field.title}</h3>
                 <span className={saved ? 'notice success' : 'notice'}>{saved ? 'Saved' : 'Not uploaded'}</span>
               </div>
               {saved ? (
                 <div className="company-asset-saved">
                   <img
-                    src={`/api/tenants/${tenantId}/company-assets/${field.assetType}/content`}
+                    src={`/api/platform/company-assets/${field.assetType}/content`}
                     alt={`Saved ${field.title.toLowerCase()}`}
                     width={160}
                     height={100}

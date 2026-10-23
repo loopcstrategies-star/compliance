@@ -314,6 +314,25 @@ describe('administration and retention', () => {
     await platform.get(`/tenants/${tenantA.id}/company-assets/logo/content`).expect(200);
     await platform.get(`/tenants/${tenantB.id}/company-assets/logo/content`).expect(404);
     await employee.get(`/tenants/${tenantA.id}/company-assets`).expect(403);
+
+    const customerLogoCount = await admin.tenantCompanyAsset.count({
+      where: { tenantId: tenantA.id, assetType: 'logo' },
+    });
+    const platformLogo = await platform
+      .post('/platform/company-assets')
+      .field('assetType', 'logo')
+      .attach('file', png, 'platform-logo.png')
+      .expect(201);
+    expect(platformLogo.body.assetType).toBe('logo');
+    expect(await admin.tenantCompanyAsset.count({ where: { tenantId: system.id, assetType: 'logo' } })).toBe(1);
+    expect(await admin.tenantCompanyAsset.count({ where: { tenantId: tenantA.id, assetType: 'logo' } })).toBe(
+      customerLogoCount,
+    );
+
+    const platformListed = await platform.get('/platform/company-assets').expect(200);
+    expect(platformListed.body.some((item: { assetType: string }) => item.assetType === 'logo')).toBe(true);
+    await platform.get('/platform/company-assets/logo/content').expect(200);
+    await employee.get('/platform/company-assets').expect(403);
   });
 
   async function login(email: string) {

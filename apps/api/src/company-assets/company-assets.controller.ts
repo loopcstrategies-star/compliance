@@ -1,4 +1,17 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, StreamableFile, UploadedFile, UseFilters, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  ServiceUnavailableException,
+  StreamableFile,
+  UploadedFile,
+  UseFilters,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RequirePermissions } from '../auth/auth.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,15 +30,85 @@ export class CompanyAssetsController {
   @Get('tenants/:tenantId/company-assets')
   @RequirePermissions('tenant.manage')
   async list(@Param('tenantId') tenantId: string) {
+    return this.listForTenant(tenantId);
+  }
+
+  @Post('tenants/:tenantId/company-assets')
+  @RequirePermissions('tenant.manage')
+  @UseInterceptors(FileInterceptor('file', uploadOptions))
+  async upload(
+    @Param('tenantId') tenantId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { assetType?: string; authorisedUseConfirmed?: string },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, isSystem: true } });
+    if (!tenant || tenant.isSystem) {
+      throw new BadRequestException('Select an onboarding company');
+    }
+    return this.uploadForTenant(tenantId, file, body);
+  }
+
+  @Get('tenants/:tenantId/company-assets/:assetType/content')
+  @RequirePermissions('tenant.manage')
+  async content(@Param('tenantId') tenantId: string, @Param('assetType') rawType: string) {
+    return this.contentForTenant(tenantId, rawType);
+  }
+
+  @Get('platform/company-assets')
+  @RequirePermissions('tenant.manage')
+  async listPlatform() {
+    return this.listForTenant(await this.resolvePlatformTenantId());
+  }
+
+  @Post('platform/company-assets')
+  @RequirePermissions('tenant.manage')
+  @UseInterceptors(FileInterceptor('file', uploadOptions))
+  async uploadPlatform(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { assetType?: string; authorisedUseConfirmed?: string },
+  ) {
+    return this.uploadForTenant(await this.resolvePlatformTenantId(), file, body);
+  }
+
+  @Get('platform/company-assets/:assetType/content')
+  @RequirePermissions('tenant.manage')
+  async contentPlatform(@Param('assetType') rawType: string) {
+    return this.contentForTenant(await this.resolvePlatformTenantId(), rawType);
+  }
+
+  private async resolvePlatformTenantId(): Promise<string> {
+    const systems = await this.prisma.tenant.findMany({
+      where: { isSystem: true },
+      select: { id: true },
+      take: 2,
+    });
+    if (systems.length === 0) {
+      throw new ServiceUnavailableException('Platform company tenant is not configured');
+    }
+    if (systems.length > 1) {
+      throw new ServiceUnavailableException('Multiple platform company tenants were found');
+    }
+    return systems[0].id;
+  }
+
+  private listForTenant(tenantId: string) {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const [assets, letterhead] = await Promise.all([
         tx.tenantCompanyAsset.findMany({
           where: { tenantId },
-          include: { file: { select: { id: true, mediaType: true, byteSize: true, createdAt: true, scanStatus: true, quarantinedAt: true } } },
+          include: {
+            file: {
+              select: { id: true, mediaType: true, byteSize: true, createdAt: true, scanStatus: true, quarantinedAt: true },
+            },
+          },
         }),
         tx.letterhead.findUnique({
           where: { tenantId },
-          include: { file: { select: { id: true, mediaType: true, byteSize: true, createdAt: true, scanStatus: true, quarantinedAt: true } } },
+          include: {
+            file: {
+              select: { id: true, mediaType: true, byteSize: true, createdAt: true, scanStatus: true, quarantinedAt: true },
+            },
+          },
         }),
       ]);
       const response = assets
@@ -50,21 +133,14 @@ export class CompanyAssetsController {
     });
   }
 
-  @Post('tenants/:tenantId/company-assets')
-  @RequirePermissions('tenant.manage')
-  @UseInterceptors(FileInterceptor('file', uploadOptions))
-  async upload(
-    @Param('tenantId') tenantId: string,
-    @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() body: { assetType?: string; authorisedUseConfirmed?: string },
+  private async uploadForTenant(
+    tenantId: string,
+    file: Express.Multer.File | undefined,
+    body: { assetType?: string; authorisedUseConfirmed?: string },
   ) {
     const assetType = parseAssetType(body?.assetType);
     if (assetType === 'authorised_signature' && body?.authorisedUseConfirmed !== 'true') {
       throw new BadRequestException('Confirm that you are authorised to upload and use this signature image');
-    }
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, isSystem: true } });
-    if (!tenant || tenant.isSystem) {
-      throw new BadRequestException('Select an onboarding company');
     }
     const stored = await this.files.store(tenantId, requireFile(file).buffer, 'image');
     return this.prisma.withTenant(tenantId, async (tx) => {
@@ -92,9 +168,7 @@ export class CompanyAssetsController {
     });
   }
 
-  @Get('tenants/:tenantId/company-assets/:assetType/content')
-  @RequirePermissions('tenant.manage')
-  async content(@Param('tenantId') tenantId: string, @Param('assetType') rawType: string) {
+  private async contentForTenant(tenantId: string, rawType: string) {
     const assetType = parseAssetType(rawType);
     const file = await this.prisma.withTenant(tenantId, async (tx) => {
       if (assetType === 'letterhead') {

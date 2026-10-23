@@ -71,9 +71,6 @@ export default async function CompanyOnboardingPage({
                       >
                         Open New Request
                       </a>
-                      <a href={`/workspace/company/branding?tenant=${encodeURIComponent(company.id)}`}>
-                        Use for branding
-                      </a>
                     </td>
                   </tr>
                 ))}

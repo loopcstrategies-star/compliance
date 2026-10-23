@@ -929,33 +929,75 @@ table.queue th {
   gap: 1rem;
 }
 
+.company-assets-grid > * {
+  min-width: 0;
+}
+
 .company-asset-card {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 0.9rem;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 0.8rem;
   background: #fff;
   align-content: start;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.company-asset-card .panel-head {
+.company-asset-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
   align-items: start;
+  min-width: 0;
 }
 
-.company-asset-card .panel-head h3 {
+.company-asset-card-head h3 {
   margin: 0;
   font-size: 1rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
-.company-asset-card .panel-head > .notice {
+.company-asset-card-head > .notice {
   margin: 0;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.company-asset-card form {
+  display: grid;
+  gap: 0.75rem;
+  align-content: end;
+  min-width: 0;
+}
+
+.company-asset-card form label {
+  min-width: 0;
+}
+
+.company-asset-card input[type='file'] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.company-asset-card button {
+  width: 100%;
+}
+
+.company-asset-saved {
+  min-width: 0;
 }
 
 .company-asset-saved img {
   display: block;
   width: min(100%, 10rem);
+  max-width: 100%;
   height: 6.25rem;
   object-fit: contain;
   object-position: left center;
@@ -975,10 +1017,12 @@ table.queue th {
   align-items: flex-start;
   gap: 0.55rem;
   font-size: 0.9rem;
+  min-width: 0;
 }
 
 .company-asset-consent input {
   margin-top: 0.2rem;
+  flex-shrink: 0;
 }
 
 @media (max-width: 1100px) {
