@@ -30,7 +30,7 @@ export function CreateCompanyForm() {
         setError('The company was created, but its identifier was missing. Refresh and select it from the list.');
         return;
       }
-      router.push(`/workspace/company?tenant=${encodeURIComponent(id)}&created=1`);
+      router.push(`/workspace/company/onboarding?tenant=${encodeURIComponent(id)}&created=1`);
     } catch {
       setError('The company could not be created. Check your connection and try again.');
     } finally {
@@ -40,14 +40,9 @@ export function CreateCompanyForm() {
 
   return (
     <form onSubmit={onSubmit} className="company-create-form">
-      <h3>Create onboarding company</h3>
-      <p className="notice">
-        This company is for customer invitations. After you create it, open New Request, issue a one-time accept link, and
-        share that link manually. The Platform tenant cannot receive applicants.
-      </p>
       <label>
         Company name
-        <input name="name" required autoComplete="organization" />
+        <input name="name" required autoComplete="organization" placeholder="Enter company name" />
       </label>
       {error ? (
         <p className="notice error" role="alert">

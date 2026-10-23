@@ -11,11 +11,11 @@ export type CompanyAssetSummary = {
   uploadedAt: string;
 };
 
-const ASSET_FIELDS: { assetType: AssetType; title: string; description: string }[] = [
-  { assetType: 'logo', title: 'Company logo', description: 'Upload this company’s logo for its own records and documents.' },
-  { assetType: 'stamp', title: 'Company stamp', description: 'Upload a clear image of this company’s official stamp.' },
-  { assetType: 'letterhead', title: 'Company letterhead', description: 'Upload this company’s letterhead image for document generation.' },
-  { assetType: 'authorised_signature', title: "Authorised person's signature", description: 'Upload a signature image for this company’s documents only when you are authorised to use it.' },
+const ASSET_FIELDS: { assetType: AssetType; title: string }[] = [
+  { assetType: 'logo', title: 'Company logo' },
+  { assetType: 'stamp', title: 'Company stamp' },
+  { assetType: 'letterhead', title: 'Company letterhead' },
+  { assetType: 'authorised_signature', title: "Authorised person's signature" },
 ];
 
 export function CompanyAssetsForm({
@@ -70,11 +70,6 @@ export function CompanyAssetsForm({
 
   return (
     <div id="company-assets">
-      <p className="notice">
-        Upload and save brand images for <strong>{tenantName}</strong> for this company&apos;s own document use. These
-        uploads do not invite a customer. Accepted formats are JPG and PNG, up to 10 MB each. PDF files are not accepted
-        here.
-      </p>
       {!assetsLoaded ? (
         <p className="notice error">
           Saved attachments could not be loaded. Uploading may require the latest API migration to be deployed.
@@ -87,10 +82,7 @@ export function CompanyAssetsForm({
           return (
             <article key={field.assetType} className="company-asset-card">
               <div className="panel-head">
-                <div>
-                  <h3>{field.title}</h3>
-                  <p>{field.description}</p>
-                </div>
+                <h3>{field.title}</h3>
                 <span className={saved ? 'notice success' : 'notice'}>{saved ? 'Saved' : 'Not uploaded'}</span>
               </div>
               {saved ? (
@@ -102,8 +94,7 @@ export function CompanyAssetsForm({
                     height={100}
                   />
                   <p className="muted">
-                    {saved.mediaType.toUpperCase()} · {formatBytes(saved.byteSize)} · Saved{' '}
-                    {new Date(saved.uploadedAt).toLocaleString()}
+                    {formatBytes(saved.byteSize)} · Saved {new Date(saved.uploadedAt).toLocaleString()}
                   </p>
                 </div>
               ) : null}

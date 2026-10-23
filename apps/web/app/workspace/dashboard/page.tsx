@@ -142,16 +142,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <article className="panel">
               <h3><Icon name="bars" /> Quick actions</h3>
               <div className="quick-grid">
-                {canManage ? <Action href={`/workspace/company?tenant=${tenantId}#copy`} icon="plus" title="Add new company" text="Create a company from selected configuration." /> : null}
+                {canManage ? <Action href="/workspace/company/onboarding" icon="plus" title="Add new company" text="Create an onboarding company for customer invitations." /> : null}
                 {canInvite ? <Action href={`/workspace/requests${suffix}`} icon="send" title="Send invitation" text="Issue a one-time onboarding link." /> : null}
-                {canManage ? <Action href={`/workspace/company?tenant=${tenantId}#company-assets`} icon="upload" title="Company attachments" text="Upload the company logo, stamp, letterhead, and authorised signature." /> : null}
+                {canManage ? <Action href={`/workspace/company/branding?tenant=${tenantId}`} icon="upload" title="Company branding" text="Upload the company logo, stamp, letterhead, and authorised signature." /> : null}
                 <Action href="#overview" icon="chart" title="View reports" text="The counts on this page are the report." />
               </div>
             </article>
             <article className="company-card" id="overview">
               <header className="panel-head">
                 <h3><Icon name="building" /> Company profile</h3>
-                {canManage ? <a href={`/workspace/company?tenant=${tenantId}`}>Manage</a> : null}
+                {canManage ? <a href="/workspace/company">Manage</a> : null}
               </header>
               <p><strong>{company}</strong></p>
               <ul className="readiness">
