@@ -13,34 +13,49 @@ export function CreateCompanyForm() {
     setError('');
     setPending(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch('/api/tenants', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: form.get('name') }),
-    });
-    setPending(false);
-    if (!response.ok) {
-      const message = await readMessage(response);
-      setError(message ?? 'The company was not created.');
-      return;
+    try {
+      const response = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: form.get('name') }),
+      });
+      if (!response.ok) {
+        const message = await readMessage(response);
+        setError(message ?? 'The company was not created.');
+        return;
+      }
+      const body = (await response.json()) as { id?: unknown; name?: unknown };
+      const id = typeof body.id === 'string' ? body.id.trim() : '';
+      if (!id) {
+        setError('The company was created, but its identifier was missing. Refresh and select it from the list.');
+        return;
+      }
+      router.push(`/workspace/company?tenant=${encodeURIComponent(id)}&created=1`);
+    } catch {
+      setError('The company could not be created. Check your connection and try again.');
+    } finally {
+      setPending(false);
     }
-    event.currentTarget.reset();
-    router.refresh();
   }
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} className="company-create-form">
       <h3>Create onboarding company</h3>
       <p className="notice">
-        This company is for customer invitations only. After you create it, open New Request, issue a one-time accept link, and share that link manually. The Platform tenant cannot receive applicants.
+        This company is for customer invitations. After you create it, open New Request, issue a one-time accept link, and
+        share that link manually. The Platform tenant cannot receive applicants.
       </p>
       <label>
         Company name
-        <input name="name" required />
+        <input name="name" required autoComplete="organization" />
       </label>
-      {error ? <p className="notice error">{error}</p> : null}
+      {error ? (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      ) : null}
       <button type="submit" disabled={pending}>
-        {pending ? 'Creating' : 'Create company'}
+        {pending ? 'Creating…' : 'Create company'}
       </button>
     </form>
   );
