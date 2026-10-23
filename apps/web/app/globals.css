@@ -751,6 +751,15 @@ table.queue th {
   }
 }
 
+.workflow-gap {
+  margin-top: 1.25rem;
+}
+
+#onboarding-companies > form,
+#onboarding-companies > #copy {
+  margin-top: 1rem;
+}
+
 .company-asset-card {
   display: grid;
   gap: 0.9rem;
