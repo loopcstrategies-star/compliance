@@ -30,8 +30,10 @@ export function CreateCompanyForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <h2>Create onboarding company</h2>
-      <p className="notice">Customer invitations use this company. The Platform tenant cannot receive applicants.</p>
+      <h3>Create onboarding company</h3>
+      <p className="notice">
+        This company is for customer invitations only. After you create it, open New Request, issue a one-time accept link, and share that link manually. The Platform tenant cannot receive applicants.
+      </p>
       <label>
         Company name
         <input name="name" required />

@@ -12,10 +12,10 @@ export type CompanyAssetSummary = {
 };
 
 const ASSET_FIELDS: { assetType: AssetType; title: string; description: string }[] = [
-  { assetType: 'logo', title: 'Company logo', description: 'Upload the company logo used for company records.' },
-  { assetType: 'stamp', title: 'Company stamp', description: 'Upload a clear image of the official company stamp.' },
-  { assetType: 'letterhead', title: 'Company letterhead', description: 'Upload the company letterhead image. This updates the existing tenant letterhead used by document generation.' },
-  { assetType: 'authorised_signature', title: "Authorised person's signature", description: 'Upload a signature image only when you are authorised to use it on company documents.' },
+  { assetType: 'logo', title: 'Company logo', description: 'Upload this company’s logo for its own records and documents.' },
+  { assetType: 'stamp', title: 'Company stamp', description: 'Upload a clear image of this company’s official stamp.' },
+  { assetType: 'letterhead', title: 'Company letterhead', description: 'Upload this company’s letterhead image for document generation.' },
+  { assetType: 'authorised_signature', title: "Authorised person's signature", description: 'Upload a signature image for this company’s documents only when you are authorised to use it.' },
 ];
 
 export function CompanyAssetsForm({
@@ -69,10 +69,9 @@ export function CompanyAssetsForm({
   }
 
   return (
-    <section className="panel" id="company-assets">
-      <h2>Company attachments</h2>
+    <div id="company-assets">
       <p className="notice">
-        Upload and save the image assets for <strong>{tenantName}</strong>. Accepted formats are JPG and PNG images, up to 10 MB each. PDF files are not accepted in this section.
+        Upload and save brand images for <strong>{tenantName}</strong> for this company&apos;s own document use. These uploads do not invite a customer. Accepted formats are JPG and PNG, up to 10 MB each. PDF files are not accepted here.
       </p>
       {!assetsLoaded ? <p className="notice error">Saved attachments could not be loaded. Uploading may require the latest API migration to be deployed.</p> : null}
       {ASSET_FIELDS.map((field) => {
@@ -120,7 +119,7 @@ export function CompanyAssetsForm({
       })}
       {error ? <p className="notice error" role="alert">{error}</p> : null}
       {message ? <p className="notice success" role="status">{message}</p> : null}
-    </section>
+    </div>
   );
 }
 
