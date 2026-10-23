@@ -257,6 +257,78 @@ describe('drafts and invitations', () => {
         where: { applicationId },
       }),
     );
+
+    expect(resumed.body.editable).toBe(true);
+    const keepCompleted = await customer
+      .put(`/applications/${applicationId}/sections/kyc.pep`)
+      .send({
+        answers: {
+          'kyc.pep.a': { answer: 'no', details: '' },
+          'kyc.pep.b': { answer: 'no', details: '' },
+        },
+        markComplete: false,
+      })
+      .expect(200);
+    expect(keepCompleted.body.sections.find((section: { sectionKey: string }) => section.sectionKey === 'kyc.pep').status).toBe(
+      'completed',
+    );
+  });
+
+  it('locks a submitted application from further section edits', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'locked@example.com', legalName: 'Locked Metals', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Locked Metals' }).expect(201);
+    const draft = await customer.get('/applications/current').expect(200);
+    const applicationId = draft.body.application.id as string;
+
+    await customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Locked Metals LLC' }, markComplete: false })
+      .expect(200);
+
+    await admin.application.update({
+      where: { id: applicationId },
+      data: { status: 'submitted', statusChangedAt: new Date() },
+    });
+    const submission = await admin.submission.create({
+      data: {
+        tenantId: tenantA.id,
+        applicationId,
+        documentVersion: 1,
+        packageIds: [],
+        snapshot: { schemaVersion: 1, answers: { 'kyc.entity.name': 'Locked Metals LLC' }, evidenceIds: [], packageIds: [] },
+      },
+    });
+
+    const current = await customer.get('/applications/current').expect(200);
+    expect(current.body.editable).toBe(false);
+    expect(current.body.application.status).toBe('submitted');
+    expect(current.body.application.id).toBe(applicationId);
+    expect(new Date(current.body.submittedAt).getTime()).toBe(submission.createdAt.getTime());
+    expect(current.body.answers['kyc.entity.name']).toBe('Locked Metals LLC');
+
+    await customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Should Fail' }, markComplete: false })
+      .expect(409);
+    await customer.post(`/applications/${applicationId}/submit`).expect(400);
+
+    const employeeBoard = await employee.get(`/applications?view=requests&tenantId=${tenantA.id}`).expect(200);
+    const row = employeeBoard.body.items.find((item: { id: string }) => item.id === applicationId);
+    expect(row).toBeTruthy();
+    expect(row.legalName).toBe('Locked Metals');
+    expect(row.submittedAt).toBeTruthy();
+    expect(new Date(row.submittedAt).getTime()).toBe(submission.createdAt.getTime());
+    expect(employeeBoard.body.items.every((item: { status: string }) => item.status === 'submitted')).toBe(true);
+
+    const foreign = await login('employee-b@example.com');
+    const foreignBoard = await foreign.get(`/applications?view=requests&tenantId=${tenantB.id}`).expect(200);
+    expect(foreignBoard.body.items.some((item: { id: string }) => item.id === applicationId)).toBe(false);
   });
 
   it('requires the domestic VAT row only for a local company and keeps the source label', async () => {

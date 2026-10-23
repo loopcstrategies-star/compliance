@@ -10,6 +10,7 @@ export type QueueItem = {
   assignee: string;
   createdAt: string;
   statusChangedAt: string;
+  submittedAt?: string | null;
   overdue: boolean;
   documentVersion: number;
 };

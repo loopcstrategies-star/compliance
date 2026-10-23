@@ -86,6 +86,12 @@ export class ReviewService {
           statusChangedAt: true,
           assignee: { select: { displayName: true } },
           customer: { select: { legalName: true, customerType: true } },
+          submissions: {
+            where: { supersededAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true },
+          },
         },
         orderBy: { statusChangedAt: 'asc' },
       });
@@ -96,6 +102,7 @@ export class ReviewService {
         documentVersion: row.documentVersion,
         createdAt: row.createdAt,
         statusChangedAt: row.statusChangedAt,
+        submittedAt: row.submissions[0]?.createdAt ?? null,
         legalName: row.customer.legalName,
         customerType: row.customer.customerType,
         assignee: row.assignee?.displayName ?? '',
@@ -109,10 +116,17 @@ export class ReviewService {
         customers: decorated.filter((row) => CUSTOMER_STATUSES.includes(row.status)).length,
         overdue: decorated.filter((row) => row.overdue).length,
       };
-      const items =
+      let items =
         view === 'dashboard'
           ? []
           : decorated.filter((row) => statuses!.includes(row.status));
+      if (view === 'requests') {
+        items = [...items].sort((a, b) => {
+          const aTime = a.submittedAt?.getTime() ?? a.statusChangedAt.getTime();
+          const bTime = b.submittedAt?.getTime() ?? b.statusChangedAt.getTime();
+          return bTime - aTime;
+        });
+      }
       if (view !== 'dashboard') {
         return { tenantId, counts, items };
       }
@@ -340,7 +354,11 @@ export class ReviewService {
           },
         },
       });
-      return { ...updated, submissionId: submission.id };
+      return {
+        ...updated,
+        submissionId: submission.id,
+        submittedAt: submission.createdAt,
+      };
     });
   }
 
