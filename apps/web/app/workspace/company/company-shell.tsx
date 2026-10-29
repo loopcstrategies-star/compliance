@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { apiGet } from '../../../lib/api';
 import type { Me } from '../../../lib/session';
 import { CompanyNetworkNav } from './company-network-nav';
+import { MessageIcon } from './network-icons';
+import { NetworkAccountMenu } from './network-account-menu';
 import { NetworkSearch } from './network-search';
 import { NotificationsBell } from './notifications-bell';
 
@@ -12,38 +14,36 @@ export async function CompanyShell({ me, children }: { me: Me; children: ReactNo
     apiGet<{ count: number }>('/company-network/notifications/unread-count'),
   ]);
   const isSuperAdmin = me.roles.includes('super_admin');
+  const messageCount = unread?.count ?? 0;
 
   return (
     <div className="network-shell">
       <header className="network-shell-header">
-        <div className="network-shell-brand">
+        <Link className="network-shell-brand" href="/workspace/company">
           <div className="network-shell-mark" aria-hidden="true" />
           <div>
             <h2>LoopC Network</h2>
             <p>Trusted business connections.</p>
           </div>
-        </div>
+        </Link>
         <div className="network-shell-tools">
           <NotificationsBell initialCount={notificationUnread?.count ?? 0} />
           <Link
-            className="network-shell-icon-link"
+            className="network-shell-icon-link network-shell-icon-link--icon"
             href="/workspace/company/messages"
-            aria-label={
-              unread && unread.count > 0 ? `Messages, ${unread.count} unread` : 'Messages'
-            }
+            aria-label={messageCount > 0 ? `Messages, ${messageCount} unread` : 'Messages'}
           >
-            Messages
-            {unread && unread.count > 0 ? (
-              <span className="unread-pill">{unread.count > 99 ? '99+' : unread.count}</span>
+            <MessageIcon />
+            <span className="network-shell-icon-label">Messages</span>
+            {messageCount > 0 ? (
+              <span className="unread-pill">{messageCount > 99 ? '99+' : messageCount}</span>
             ) : null}
           </Link>
-          <span className="network-shell-account" title={me.email}>
-            {me.displayName || me.email}
-          </span>
+          <NetworkAccountMenu displayName={me.displayName || me.email} email={me.email} />
         </div>
       </header>
       <NetworkSearch />
-      <CompanyNetworkNav unreadCount={unread?.count ?? 0} />
+      <CompanyNetworkNav unreadCount={messageCount} />
       {isSuperAdmin ? (
         <section className="company-admin-strip" aria-label="Platform administration">
           <span className="company-admin-strip-label">Platform admin</span>

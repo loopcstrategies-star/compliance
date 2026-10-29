@@ -1,22 +1,32 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ConversationRow, MessageRow } from './network-types';
 
 export function MessagesClient({
   initialConversations,
   initialConversationId,
+  peerTenantId,
+  peerConnectionId,
+  peerName,
 }: {
   initialConversations: ConversationRow[];
   initialConversationId?: string;
+  peerTenantId?: string;
+  peerConnectionId?: string;
+  peerName?: string;
 }) {
   const [conversations, setConversations] = useState(initialConversations);
-  const [activeId, setActiveId] = useState(initialConversationId || initialConversations[0]?.id || '');
+  const [activeId, setActiveId] = useState(initialConversationId || '');
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [body, setBody] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
+  const [pendingPeer, setPendingPeer] = useState(
+    Boolean(peerConnectionId && peerTenantId && !initialConversationId),
+  );
   const active = conversations.find((row) => row.id === activeId);
 
   const filtered = useMemo(() => {
@@ -66,7 +76,9 @@ export function MessagesClient({
   }
 
   useEffect(() => {
-    void loadMessages(activeId);
+    if (activeId) {
+      void loadMessages(activeId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -83,22 +95,39 @@ export function MessagesClient({
 
   async function onSend(event: FormEvent) {
     event.preventDefault();
-    if (!activeId || !body.trim()) {
+    if (!body.trim()) {
       return;
     }
     setError('');
+    const payload =
+      activeId
+        ? { conversationId: activeId, body }
+        : peerConnectionId
+          ? { connectionId: peerConnectionId, body }
+          : null;
+    if (!payload) {
+      return;
+    }
     const response = await fetch('/api/company-network/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ conversationId: activeId, body }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       setError('The message was not sent.');
       return;
     }
     const message = await response.json();
-    setMessages((rows) => [...rows, message]);
     setBody('');
+    if (pendingPeer && message.conversationId) {
+      setPendingPeer(false);
+      setActiveId(message.conversationId);
+      setMessages([message]);
+      await loadConversations();
+      return;
+    }
+    await loadConversations();
+    setMessages((rows) => [...rows, message]);
     setConversations((rows) =>
       rows.map((row) =>
         row.id === activeId
@@ -117,6 +146,9 @@ export function MessagesClient({
     );
   }
 
+  const threadTitle = active?.peerName || peerName || 'Messages';
+  const canCompose = Boolean(activeId || (pendingPeer && peerConnectionId));
+
   return (
     <div className="messages-layout">
       <aside className="panel messages-list">
@@ -132,7 +164,10 @@ export function MessagesClient({
               <button
                 type="button"
                 className={row.id === activeId ? 'is-active' : undefined}
-                onClick={() => setActiveId(row.id)}
+                onClick={() => {
+                  setPendingPeer(false);
+                  setActiveId(row.id);
+                }}
               >
                 <strong>{row.peerName}</strong>
                 <span>{row.lastMessage?.body || 'No messages yet'}</span>
@@ -143,7 +178,17 @@ export function MessagesClient({
         </ul>
       </aside>
       <section className="panel messages-thread">
-        {active ? <h3>{active.peerName}</h3> : <h3>Messages</h3>}
+        <div className="messages-thread-head">
+          <h3>{threadTitle}</h3>
+          {(active?.peerTenantId || peerTenantId) && (
+            <Link
+              className="button-link button-link--outline"
+              href={`/workspace/company/discover/${active?.peerTenantId || peerTenantId}`}
+            >
+              View profile
+            </Link>
+          )}
+        </div>
         {loading ? <p className="notice">Loading messages…</p> : null}
         {error ? <p className="notice error">{error}</p> : null}
         <div className="message-history">
@@ -156,9 +201,16 @@ export function MessagesClient({
               <p>{message.body}</p>
             </article>
           ))}
-          {!loading && active && messages.length === 0 ? <p className="notice">Start the conversation.</p> : null}
+          {!loading && canCompose && messages.length === 0 ? (
+            <p className="notice">
+              {pendingPeer ? `Start a conversation with ${peerName || 'this company'}.` : 'Start the conversation.'}
+            </p>
+          ) : null}
+          {!canCompose ? (
+            <p className="notice">Select a conversation or open Message from a connected company profile.</p>
+          ) : null}
         </div>
-        {active ? (
+        {canCompose ? (
           <form className="message-composer" onSubmit={onSend}>
             <label>
               Message

@@ -45,7 +45,7 @@ export function DiscoverClient() {
       const response = await fetch(`/api/company-network/discover?${params.toString()}`);
       setLoading(false);
       if (!response.ok) {
-        setError('Company discovery is unavailable right now.');
+        setError(response.status === 403 ? 'forbidden' : 'Company discovery is unavailable right now.');
         setData(null);
         return;
       }
@@ -97,11 +97,16 @@ export function DiscoverClient() {
         </button>
       </form>
       {loading ? <p className="notice">Loading companies…</p> : null}
-      {error ? (
-        <NetworkUnavailable
-          title="Company discovery is unavailable right now"
-          onRetry={() => void load(page)}
-        />
+      {error === 'forbidden' ? (
+        <NetworkUnavailable title="Company discovery is not available for this account" />
+      ) : null}
+      {error && error !== 'forbidden' ? (
+        <p className="notice error">
+          {error}{' '}
+          <button type="button" className="button-secondary" onClick={() => void load(page)}>
+            Retry
+          </button>
+        </p>
       ) : null}
       {!loading && data && data.items.length === 0 ? (
         <p className="notice">No discoverable companies match these filters.</p>

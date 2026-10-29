@@ -1550,6 +1550,141 @@ table.queue th {
   color: #fff;
   text-decoration: none;
   font-weight: 600;
+  position: relative;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.network-shell-icon-link--icon {
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.65rem;
+}
+
+.network-shell-icon-link--icon:hover,
+.network-shell-icon-link--icon:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.network-shell-icon-label {
+  font-size: 0.86rem;
+}
+
+.network-shell-brand {
+  text-decoration: none;
+  color: inherit;
+}
+
+.network-account-menu {
+  position: relative;
+}
+
+.network-shell-account--button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: #fff;
+}
+
+.network-account-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 30;
+  min-width: 14rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.network-account-panel a,
+.network-account-signout {
+  text-align: left;
+  text-decoration: none;
+  color: var(--navy);
+  font-weight: 600;
+  border: 0;
+  background: transparent;
+  padding: 0.35rem 0.2rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.network-account-panel a:hover,
+.network-account-signout:hover {
+  color: var(--teal);
+}
+
+.network-list li.is-unread {
+  background: rgba(15, 118, 110, 0.06);
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.network-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.85rem;
+}
+
+.network-overview-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.network-overview-card h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  color: var(--navy);
+}
+
+.network-person-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.network-person-avatar,
+.network-person-avatar--placeholder {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: rgba(15, 118, 110, 0.1);
+}
+
+.network-person-avatar--placeholder {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.messages-thread-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.messages-thread-head h3 {
+  margin: 0;
 }
 
 .network-shell-account {
@@ -2350,6 +2485,10 @@ button.button-secondary {
 
   .network-profile-tabs {
     overflow-x: auto;
+  }
+
+  .network-shell-icon-label {
+    display: none;
   }
 
   .network-list li {

@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ConnectionActions } from './connection-actions';
 import { FeedClient } from './feed-client';
+import { PeerMembers } from './peer-members';
 import type { NetworkProfile } from './network-types';
 
-type TabId = 'about' | 'posts';
+type TabId = 'overview' | 'about' | 'activity' | 'people';
 
 function websiteHost(website: string) {
   try {
@@ -23,7 +24,7 @@ export function PeerCompanyProfile({
   profile: NetworkProfile;
   isOwn: boolean;
 }) {
-  const [tab, setTab] = useState<TabId>('about');
+  const [tab, setTab] = useState<TabId>('overview');
   const locationLine = useMemo(
     () =>
       [profile.industry, ...(profile.businessCategories ?? []).slice(0, 2), profile.city, profile.country]
@@ -59,7 +60,7 @@ export function PeerCompanyProfile({
           )}
           <div className="network-profile-identity-copy">
             <h1 className="network-profile-name">{profile.companyName}</h1>
-            <p className="network-profile-headline">{profile.headline || 'No headline'}</p>
+            {profile.headline ? <p className="network-profile-headline">{profile.headline}</p> : null}
             {locationLine ? <p className="muted-line">{locationLine}</p> : null}
             {(profile.companySize || profile.yearEstablished) && (
               <p className="muted-line">
@@ -92,8 +93,10 @@ export function PeerCompanyProfile({
       <div className="network-profile-tabs" role="tablist" aria-label="Company profile sections">
         {(
           [
+            { id: 'overview', label: 'Overview' },
             { id: 'about', label: 'About' },
-            { id: 'posts', label: 'Posts' },
+            { id: 'activity', label: 'Activity' },
+            { id: 'people', label: 'People' },
           ] as const
         ).map((item) => (
           <button
@@ -109,14 +112,50 @@ export function PeerCompanyProfile({
         ))}
       </div>
 
+      {tab === 'overview' ? (
+        <div className="network-profile-panel" role="tabpanel">
+          <div className="network-overview-grid">
+            <article className="network-overview-card">
+              <h2>About</h2>
+              <p>{profile.introduction || 'No introduction published.'}</p>
+              <button type="button" className="button-link button-link--outline" onClick={() => setTab('about')}>
+                Read more
+              </button>
+            </article>
+            <article className="network-overview-card">
+              <h2>Activity</h2>
+              <p>See updates this company has shared on LoopC Network.</p>
+              <button type="button" className="button-link button-link--outline" onClick={() => setTab('activity')}>
+                View activity
+              </button>
+            </article>
+            <article className="network-overview-card">
+              <h2>People</h2>
+              <p>Meet the representatives published for this company.</p>
+              <button type="button" className="button-link button-link--outline" onClick={() => setTab('people')}>
+                View people
+              </button>
+            </article>
+          </div>
+        </div>
+      ) : null}
+
       {tab === 'about' ? (
         <div className="network-profile-panel network-profile-body" role="tabpanel">
           <h2>About</h2>
           <p>{profile.introduction || 'No introduction published.'}</p>
-          <h2>Products and services</h2>
-          <p>{profile.productsServices || 'Not published.'}</p>
-          <h2>Capabilities</h2>
-          <p>{profile.capabilities || 'Not published.'}</p>
+          {profile.productsServices ? (
+            <>
+              <h2>Products and services</h2>
+              <p>{profile.productsServices}</p>
+            </>
+          ) : null}
+          {profile.capabilities ? (
+            <>
+              <h2>Capabilities</h2>
+              <p>{profile.capabilities}</p>
+            </>
+          ) : null}
           <h2>Public contact</h2>
           <p>
             {[profile.website, profile.publicEmail, profile.publicPhone].filter(Boolean).join(' · ') ||
@@ -125,9 +164,15 @@ export function PeerCompanyProfile({
         </div>
       ) : null}
 
-      {tab === 'posts' ? (
+      {tab === 'activity' ? (
         <div className="network-profile-panel" role="tabpanel">
           <FeedClient tenantId={profile.tenantId} />
+        </div>
+      ) : null}
+
+      {tab === 'people' ? (
+        <div className="network-profile-panel" role="tabpanel">
+          <PeerMembers tenantId={profile.tenantId} />
         </div>
       ) : null}
     </section>
