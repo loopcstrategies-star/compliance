@@ -13,3 +13,6 @@ backups/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+.env.network-test
+apps/api/storage-network-test/

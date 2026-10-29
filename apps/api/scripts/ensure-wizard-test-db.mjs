@@ -14,8 +14,9 @@ if (!migratorPass || !appPass) {
   process.exit(1);
 }
 
-const db = 'myka_wizard_test';
+const db = 'myka_network_test_20261029';
 const container = 'compliance-postgres-1';
+const out = path.join(root, '.env.network-test');
 
 function dockerPsql(args, input) {
   const result = spawnSync('docker', ['exec', '-i', container, 'psql', '-U', 'postgres', ...args], {
@@ -30,9 +31,14 @@ function dockerPsql(args, input) {
 }
 
 const exists = dockerPsql(['-tAc', `SELECT 1 FROM pg_database WHERE datname='${db}'`]).trim();
-if (!exists) {
-  dockerPsql(['-v', 'ON_ERROR_STOP=1', '-c', `CREATE DATABASE ${db}`]);
+if (exists) {
+  console.error(
+    `Database ${db} already exists. Refusing to grant permissions, modify the database, or overwrite .env.network-test.`,
+  );
+  process.exit(1);
 }
+
+dockerPsql(['-v', 'ON_ERROR_STOP=1', '-c', `CREATE DATABASE ${db}`]);
 dockerPsql([
   '-v',
   'ON_ERROR_STOP=1',
@@ -50,6 +56,5 @@ dockerPsql([
 
 const migUrl = `postgresql://myka_migrator:${encodeURIComponent(migratorPass)}@127.0.0.1:54329/${db}`;
 const appUrl = `postgresql://myka_app:${encodeURIComponent(appPass)}@127.0.0.1:54329/${db}`;
-const out = path.join(root, '.env.wizard-test');
 fs.writeFileSync(out, `DATABASE_URL=${migUrl}\nAPP_DATABASE_URL=${appUrl}\n`, 'utf8');
-console.log(`ready local database ${db}`);
+console.log(`ready isolated local database ${db}`);

@@ -1,4 +1,3 @@
-
 import dotenv from 'dotenv';
 import path from 'path';
 import { spawnSync } from 'child_process';
@@ -9,14 +8,12 @@ const root = path.resolve(
   '../../..',
 );
 
-dotenv.config({ path: path.join(root, '.env') });
-
-// Override the production/default URLs with the dedicated test URLs.
-const testEnvPath = path.join(root, '.env.wizard-test');
+const storageDir = path.join(root, 'apps/api/storage-network-test');
+const testEnvPath = path.join(root, '.env.network-test');
 const loaded = dotenv.config({ path: testEnvPath, override: true });
 
 if (loaded.error) {
-  console.error('Missing .env.wizard-test. Run ensure-wizard-test-db.mjs first.');
+  console.error('Missing .env.network-test. Run ensure-wizard-test-db.mjs first.');
   process.exit(1);
 }
 
@@ -29,7 +26,7 @@ function isExpectedTestDatabase(value) {
     return (
       ['127.0.0.1', 'localhost'].includes(url.hostname) &&
       url.port === '54329' &&
-      url.pathname === '/myka_wizard_test'
+      url.pathname === '/myka_network_test_20261029'
     );
   } catch {
     return false;
@@ -41,7 +38,7 @@ if (
   !isExpectedTestDatabase(migrationUrl)
 ) {
   console.error(
-    'Refusing to run: both database URLs must target local myka_wizard_test on port 54329.',
+    'Refusing to run: both database URLs must target local myka_network_test_20261029 on port 54329.',
   );
   process.exit(1);
 }
@@ -51,12 +48,13 @@ const env = {
   DATABASE_URL: migrationUrl,
   APP_DATABASE_URL: appUrl,
   LOCAL_MFA_DEFER: 'true',
-  FILE_STORAGE_DIR: path.join(root, 'apps/api/storage-test'),
+  FILE_STORAGE_DIR: storageDir,
 };
 
 const pattern = process.argv[2] || 'company-network';
 
-console.log('Test database: local myka_wizard_test');
+console.log('Test database: local myka_network_test_20261029');
+console.log(`Isolated storage: ${storageDir}`);
 console.log(`Test pattern: ${pattern}`);
 
 const result = spawnSync(
