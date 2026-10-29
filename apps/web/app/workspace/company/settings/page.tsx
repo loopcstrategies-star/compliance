@@ -2,6 +2,7 @@ import { apiGet } from '../../../../lib/api';
 import { requireArea } from '../../../../lib/session';
 import { CompanyShell } from '../company-shell';
 import { MemberProfileEditor } from '../member-profile-editor';
+import { NetworkUnavailable } from '../network-unavailable';
 import { SettingsClient } from '../settings-client';
 import type { NetworkProfile } from '../network-types';
 
@@ -12,7 +13,7 @@ export default async function CompanyNetworkSettingsPage() {
   return (
     <CompanyShell me={me}>
       {!profile ? (
-        <p className="notice error">Company networking settings are not available for this account.</p>
+        <NetworkUnavailable title="Company networking settings are not available for this account" />
       ) : (
         <>
           <SettingsClient profile={profile} />

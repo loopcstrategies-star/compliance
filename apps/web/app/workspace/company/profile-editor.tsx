@@ -15,12 +15,20 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
-export function ProfileEditor({ profile }: { profile: NetworkProfile }) {
+export function ProfileEditor({
+  profile,
+  defaultOpen = false,
+  compactActions = false,
+}: {
+  profile: NetworkProfile;
+  defaultOpen?: boolean;
+  compactActions?: boolean;
+}) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [section, setSection] = useState<SectionId>('overview');
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -79,17 +87,21 @@ export function ProfileEditor({ profile }: { profile: NetworkProfile }) {
   }
 
   return (
-    <div className="network-editor">
+    <div className="network-editor" id="company-profile-editor">
       <div className="network-editor-actions">
         <button type="button" onClick={() => setOpen((value) => !value)}>
-          {open ? 'Close editor' : 'Edit Profile'}
+          {open ? 'Close editor' : 'Edit profile'}
         </button>
-        <a className="button-link button-link--outline" href={`/workspace/company/discover/${profile.tenantId}`}>
-          Preview profile
-        </a>
-        <a className="button-link button-link--outline" href="/workspace/company/settings">
-          Visibility settings
-        </a>
+        {compactActions ? null : (
+          <>
+            <a className="button-link button-link--outline" href={`/workspace/company/discover/${profile.tenantId}`}>
+              Preview profile
+            </a>
+            <a className="button-link button-link--outline" href="/workspace/company/settings">
+              Visibility settings
+            </a>
+          </>
+        )}
       </div>
       {profile.completion ? (
         <div className="completion-meter" aria-label={`Profile ${profile.completion.percent}% complete`}>
