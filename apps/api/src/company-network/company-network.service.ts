@@ -142,6 +142,27 @@ export class CompanyNetworkService {
     });
   }
 
+  async getHome(auth: AuthState) {
+    await this.assertEligibleTenant(auth.tenantId);
+    const [profile, suggestions, received, conversations, unread] = await Promise.all([
+      this.getMyProfile(auth),
+      this.discover(auth, { page: '1', pageSize: '6' }),
+      this.listReceived(auth),
+      this.listConversations(auth),
+      this.unreadCount(auth),
+    ]);
+    return {
+      profile,
+      suggestions: suggestions.items,
+      suggestionTotal: suggestions.total,
+      receivedRequests: received.slice(0, 5),
+      receivedCount: received.length,
+      recentConversations: conversations.slice(0, 5),
+      unreadCount: unread.count,
+      connectionCount: typeof profile.connectionCount === 'number' ? profile.connectionCount : 0,
+    };
+  }
+
   async discover(
     auth: AuthState,
     query: { q?: string; country?: string; city?: string; industry?: string; page?: string; pageSize?: string },
@@ -158,6 +179,23 @@ export class CompanyNetworkService {
       await this.prisma.tenant.findMany({ where: { isSystem: true }, select: { id: true } })
     ).map((row) => row.id);
 
+    let nameMatchedIds: string[] = [];
+    if (q) {
+      const nameMatches = await this.prisma.tenant.findMany({
+        where: {
+          isSystem: false,
+          id: { notIn: [auth.tenantId, ...systemIds] },
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { displayName: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+        take: 200,
+      });
+      nameMatchedIds = nameMatches.map((row) => row.id);
+    }
+
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const where: Prisma.CompanyNetworkProfileWhereInput = {
         discoverable: true,
@@ -166,32 +204,34 @@ export class CompanyNetworkService {
         ...(country ? { country: { equals: country, mode: 'insensitive' } } : {}),
         ...(city ? { city: { contains: city, mode: 'insensitive' } } : {}),
         ...(industry ? { industry: { contains: industry, mode: 'insensitive' } } : {}),
+        ...(q
+          ? {
+              OR: [
+                { headline: { contains: q, mode: 'insensitive' } },
+                { industry: { contains: q, mode: 'insensitive' } },
+                { productsServices: { contains: q, mode: 'insensitive' } },
+                { capabilities: { contains: q, mode: 'insensitive' } },
+                { introduction: { contains: q, mode: 'insensitive' } },
+                ...(nameMatchedIds.length ? [{ tenantId: { in: nameMatchedIds } }] : []),
+              ],
+            }
+          : {}),
       };
 
-      const profiles = await tx.companyNetworkProfile.findMany({
+      const total = await tx.companyNetworkProfile.count({ where });
+      const slice = await tx.companyNetworkProfile.findMany({
         where,
         orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
 
-      const tenantIds = profiles.map((p) => p.tenantId);
       const tenants = await this.prisma.tenant.findMany({
-        where: { id: { in: tenantIds }, isSystem: false },
+        where: { id: { in: slice.map((p) => p.tenantId) }, isSystem: false },
         select: { id: true, name: true, displayName: true },
       });
       const tenantMap = new Map(tenants.map((t) => [t.id, t]));
 
-      let filtered = profiles.filter((p) => tenantMap.has(p.tenantId));
-      if (q) {
-        const needle = q.toLowerCase();
-        filtered = filtered.filter((p) => {
-          const tenant = tenantMap.get(p.tenantId)!;
-          const label = (tenant.displayName || tenant.name).toLowerCase();
-          return label.includes(needle) || p.headline.toLowerCase().includes(needle) || p.industry.toLowerCase().includes(needle);
-        });
-      }
-
-      const total = filtered.length;
-      const slice = filtered.slice((page - 1) * pageSize, page * pageSize);
       const connections = await tx.companyConnection.findMany({
         where: {
           OR: [
@@ -207,17 +247,19 @@ export class CompanyNetworkService {
         connectionByPeer.set(peer, connection);
       }
 
-      const items = slice.map((profile) => {
-        const tenant = tenantMap.get(profile.tenantId)!;
-        const connection = connectionByPeer.get(profile.tenantId) ?? null;
-        return {
-          ...this.toPublicDto(profile, tenant),
-          connectionStatus: this.connectionStatusForViewer(auth.tenantId, connection),
-          connectionId: connection?.id ?? null,
-        };
-      });
+      const items = slice
+        .filter((profile) => tenantMap.has(profile.tenantId))
+        .map((profile) => {
+          const tenant = tenantMap.get(profile.tenantId)!;
+          const connection = connectionByPeer.get(profile.tenantId) ?? null;
+          return {
+            ...this.toPublicDto(profile, tenant),
+            connectionStatus: this.connectionStatusForViewer(auth.tenantId, connection),
+            connectionId: connection?.id ?? null,
+          };
+        });
 
-      return { items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+      return { items, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize) || 1) };
     });
   }
 
@@ -1093,17 +1135,22 @@ export class CompanyNetworkService {
     },
     companyName: string,
   ) {
-    const checks = [
-      Boolean(companyName.trim()),
-      Boolean(profile.headline.trim()),
-      Boolean(profile.introduction.trim()),
-      Boolean(profile.industry.trim()),
-      Boolean(profile.city.trim() && profile.country.trim()),
-      Boolean(profile.website.trim()),
-      Boolean(profile.productsServices.trim()),
+    const checks: Array<{ key: string; label: string; ok: boolean }> = [
+      { key: 'companyName', label: 'Company name', ok: Boolean(companyName.trim()) },
+      { key: 'headline', label: 'Professional headline', ok: Boolean(profile.headline.trim()) },
+      { key: 'introduction', label: 'Company introduction', ok: Boolean(profile.introduction.trim()) },
+      { key: 'industry', label: 'Industry', ok: Boolean(profile.industry.trim()) },
+      { key: 'location', label: 'City and country', ok: Boolean(profile.city.trim() && profile.country.trim()) },
+      { key: 'website', label: 'Website', ok: Boolean(profile.website.trim()) },
+      { key: 'productsServices', label: 'Products and services', ok: Boolean(profile.productsServices.trim()) },
     ];
-    const done = checks.filter(Boolean).length;
-    return { done, total: checks.length, percent: Math.round((done / checks.length) * 100) };
+    const done = checks.filter((item) => item.ok).length;
+    return {
+      done,
+      total: checks.length,
+      percent: Math.round((done / checks.length) * 100),
+      missing: checks.filter((item) => !item.ok).map((item) => item.label),
+    };
   }
 }
 

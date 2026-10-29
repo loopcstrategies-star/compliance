@@ -82,7 +82,17 @@ describe('company networking', () => {
       .expect(200);
 
     const agentB = await login(employeeB.email);
-    await agentB.put('/company-network/me').send({ headline: 'Beta headline', industry: 'Trading' }).expect(200);
+    await agentB
+      .put('/company-network/me')
+      .send({
+        headline: 'Beta headline',
+        industry: 'Trading',
+        city: 'Dubai',
+        country: 'AE',
+        productsServices: 'ZYXREFINE99 wholesale',
+        capabilities: 'bullion assay',
+      })
+      .expect(200);
     await agentB.put('/company-network/me/visibility').send({ discoverable: true, visibility: 'public' }).expect(200);
 
     const mine = await agentA.get('/company-network/me').expect(200);
@@ -104,6 +114,63 @@ describe('company networking', () => {
     expect(ids).not.toContain(system.id);
     expect(JSON.stringify(listed.body)).not.toContain('registrationId');
     expect(JSON.stringify(listed.body)).not.toContain('complianceEmail');
+
+    const byIndustry = await agentA.get('/company-network/discover?industry=Trading&page=1&pageSize=10').expect(200);
+    expect(byIndustry.body.page).toBe(1);
+    expect(byIndustry.body.pageSize).toBe(10);
+    expect(byIndustry.body.totalPages).toBeGreaterThanOrEqual(1);
+    expect(byIndustry.body.items.every((item: { industry: string }) => item.industry.toLowerCase().includes('trading'))).toBe(
+      true,
+    );
+
+    const byKeyword = await agentA.get('/company-network/discover?q=Beta').expect(200);
+    expect(byKeyword.body.items.some((item: { tenantId: string }) => item.tenantId === tenantB.id)).toBe(true);
+    expect(byKeyword.body.items.every((item: { tenantId: string }) => item.tenantId !== tenantA.id)).toBe(true);
+
+    const byProducts = await agentA.get('/company-network/discover?q=ZYXREFINE99').expect(200);
+    expect(byProducts.body.items.some((item: { tenantId: string }) => item.tenantId === tenantB.id)).toBe(true);
+    expect(byProducts.body.items.every((item: { tenantId: string }) => item.tenantId !== tenantA.id)).toBe(true);
+
+    const byCountry = await agentA.get('/company-network/discover?country=AE').expect(200);
+    expect(byCountry.body.items.length).toBeGreaterThan(0);
+    expect(byCountry.body.items.every((item: { country: string }) => item.country.toLowerCase() === 'ae')).toBe(true);
+    expect(byCountry.body.items.every((item: { tenantId: string }) => item.tenantId !== tenantA.id)).toBe(true);
+
+    const byCity = await agentA.get('/company-network/discover?city=Dubai').expect(200);
+    expect(byCity.body.items.length).toBeGreaterThan(0);
+    expect(byCity.body.items.every((item: { city: string }) => item.city.toLowerCase().includes('dubai'))).toBe(true);
+
+    const pageOne = await agentA.get('/company-network/discover?page=1&pageSize=1').expect(200);
+    expect(pageOne.body.page).toBe(1);
+    expect(pageOne.body.pageSize).toBe(1);
+    expect(pageOne.body.total).toBeGreaterThanOrEqual(1);
+    expect(pageOne.body.items).toHaveLength(Math.min(1, pageOne.body.total));
+    expect(pageOne.body.totalPages).toBe(Math.max(1, Math.ceil(pageOne.body.total / 1)));
+    const beyond = await agentA
+      .get(`/company-network/discover?page=${pageOne.body.totalPages + 1}&pageSize=1`)
+      .expect(200);
+    expect(beyond.body.total).toBe(pageOne.body.total);
+    expect(beyond.body.items).toHaveLength(0);
+
+    const withStatus = listed.body.items.find((item: { tenantId: string }) => item.tenantId === tenantB.id);
+    expect(withStatus).toBeTruthy();
+    expect(withStatus.connectionStatus).toBe('none');
+    expect(withStatus.connectionId).toBeNull();
+  });
+
+  it('returns network home aggregate from authorized data only', async () => {
+    const agentA = await login(employeeA.email);
+    const home = await agentA.get('/company-network/home').expect(200);
+    expect(home.body.profile.tenantId).toBe(tenantA.id);
+    expect(home.body.profile.completion.missing).toEqual(expect.any(Array));
+    expect(home.body.suggestionTotal).toEqual(expect.any(Number));
+    expect(Array.isArray(home.body.suggestions)).toBe(true);
+    expect(home.body.suggestions.every((item: { tenantId: string }) => item.tenantId !== tenantA.id)).toBe(true);
+    expect(Array.isArray(home.body.receivedRequests)).toBe(true);
+    expect(Array.isArray(home.body.recentConversations)).toBe(true);
+    expect(home.body.unreadCount).toEqual(expect.any(Number));
+    expect(JSON.stringify(home.body)).not.toContain('registrationId');
+    expect(JSON.stringify(home.body)).not.toContain('complianceEmail');
   });
 
   it('prevents self-connect, duplicates, and opposite-direction races', async () => {
@@ -125,8 +192,18 @@ describe('company networking', () => {
     const sent = await agentA.get('/company-network/requests/sent').expect(200);
     const requestId = sent.body[0].id;
 
+    const pendingDiscover = await agentA.get('/company-network/discover').expect(200);
+    const pendingPeer = pendingDiscover.body.items.find((item: { tenantId: string }) => item.tenantId === tenantB.id);
+    expect(pendingPeer?.connectionStatus).toBe('pending_outgoing');
+    expect(pendingPeer?.connectionId).toBe(requestId);
+
     await agentA.post(`/company-network/requests/${requestId}/accept`).expect(403);
     await agentB.post(`/company-network/requests/${requestId}/accept`).expect(201);
+
+    const connectedDiscover = await agentA.get('/company-network/discover').expect(200);
+    const connectedPeer = connectedDiscover.body.items.find((item: { tenantId: string }) => item.tenantId === tenantB.id);
+    expect(connectedPeer?.connectionStatus).toBe('connected');
+    expect(connectedPeer?.connectionId).toBe(requestId);
 
     const connectionsA = await agentA.get('/company-network/connections').expect(200);
     const connectionsB = await agentB.get('/company-network/connections').expect(200);
@@ -266,6 +343,14 @@ describe('company networking', () => {
     const reRequest = await agentA.post('/company-network/requests').send({ tenantId: tenantB.id }).expect(201);
     await agentB.post(`/company-network/requests/${reRequest.body.id}/cancel`).expect(403);
     await agentA.post(`/company-network/requests/${reRequest.body.id}/cancel`).expect(201);
+
+    const toDecline = await agentA.post('/company-network/requests').send({ tenantId: tenantB.id }).expect(201);
+    expect(toDecline.body.status).toBe('pending');
+    await agentB.post(`/company-network/requests/${toDecline.body.id}/decline`).expect(201);
+    const received = await agentB.get('/company-network/requests/received').expect(200);
+    expect(received.body.some((row: { id: string }) => row.id === toDecline.body.id)).toBe(false);
+    const peer = await agentA.get(`/company-network/companies/${tenantB.id}`).expect(200);
+    expect(peer.body.connectionStatus).toBe('declined');
   });
 
   async function login(email: string) {

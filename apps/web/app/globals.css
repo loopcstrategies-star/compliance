@@ -1490,11 +1490,321 @@ table.queue th {
   font-size: 0.75rem;
 }
 
+.network-shell {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.network-shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.1rem 1.25rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #071528 0%, var(--navy) 55%, #12345c 100%);
+  color: #f8fafc;
+  box-shadow: var(--shadow);
+}
+
+.network-shell-brand {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.network-shell-mark {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(145deg, rgba(184, 134, 11, 0.95), rgba(212, 175, 55, 0.75)),
+    #b8860b;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.network-shell-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.01em;
+}
+
+.network-shell-header p {
+  margin: 0.15rem 0 0;
+  color: rgba(248, 250, 252, 0.78);
+  font-size: 0.9rem;
+}
+
+.network-shell-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.network-shell-icon-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.network-shell-account {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-global-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.network-global-search input {
+  width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.network-home,
+.network-home-columns,
+.network-home-side {
+  display: grid;
+  gap: 1rem;
+}
+
+.network-home-columns {
+  grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr);
+  align-items: start;
+}
+
+.network-home-actions,
+.network-editor-actions,
+.network-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.network-section-head {
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.network-section-head h3 {
+  margin: 0;
+  color: var(--navy);
+}
+
+.network-section-head a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.network-cover {
+  position: relative;
+}
+
+.network-cover-badge {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.85rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(7, 21, 40, 0.55);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.network-completion-prompt {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.18);
+}
+
+.network-completion-prompt ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.network-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.network-shortcut-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.network-shortcut-card:hover,
+.network-shortcut-card:focus-visible {
+  border-color: var(--teal);
+  transform: translateY(-1px);
+}
+
+.network-shortcut-card strong {
+  color: var(--navy);
+}
+
+.network-shortcut-card span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.company-admin-strip-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  align-self: center;
+}
+
+.network-settings-section {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.network-settings-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.network-settings-section h4 {
+  margin: 0;
+  color: var(--navy);
+}
+
+.network-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.network-form fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  min-inline-size: 0;
+}
+
+.network-editor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.network-editor-tabs button {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--line);
+}
+
+.network-editor-tabs button.is-active {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+
+.completion-checklist {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.network-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.network-count-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.network-count-chips span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(11, 31, 58, 0.08);
+  color: var(--navy);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .network-home-columns,
+  .network-shortcut-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .network-home-columns,
+  .network-shortcut-grid,
+  .network-global-search {
+    grid-template-columns: 1fr;
+  }
+}
+
 .company-network-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin: 0.75rem 0 1rem;
+  margin: 0.15rem 0 0.35rem;
 }
 
 .company-network-nav a {
@@ -1547,6 +1857,7 @@ table.queue th {
 }
 
 .network-cover {
+  position: relative;
   height: 10rem;
   border-radius: 0.75rem;
   background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(30, 64, 175, 0.22));

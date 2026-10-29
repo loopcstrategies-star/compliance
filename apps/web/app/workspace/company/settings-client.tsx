@@ -1,9 +1,11 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { NetworkProfile } from './network-types';
 
 export function SettingsClient({ profile }: { profile: NetworkProfile }) {
+  const router = useRouter();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,52 +47,73 @@ export function SettingsClient({ profile }: { profile: NetworkProfile }) {
       return;
     }
     setMessage('Company networking settings saved.');
+    router.refresh();
   }
 
   return (
     <form className="panel network-form" onSubmit={onSubmit}>
       <h3>Company Settings</h3>
-      <p className="notice">Privacy settings are enforced by the LoopC API. Changing visibility does not delete history.</p>
+      <p className="notice">
+        Privacy and messaging preferences are enforced by the LoopC API. Changing visibility does not delete connection
+        or message history.
+      </p>
       {message ? <p className="notice success">{message}</p> : null}
       {error ? <p className="notice error">{error}</p> : null}
-      <label className="checkbox-row">
-        <input name="discoverable" type="checkbox" defaultChecked={profile.discoverable} />
-        Allow this company to appear in Discover Companies
-      </label>
-      <label>
-        Public profile visibility
-        <select name="visibility" defaultValue={profile.visibility}>
-          <option value="private">Private</option>
-          <option value="connections">Connections only</option>
-          <option value="public">Public (with discovery)</option>
-        </select>
-      </label>
-      <label className="checkbox-row">
-        <input name="messagingEnabled" type="checkbox" defaultChecked={profile.messagingEnabled} />
-        Allow messaging with accepted connections
-      </label>
-      <label>
-        Public business email
-        <input name="publicEmail" type="email" defaultValue={profile.publicEmail} />
-      </label>
-      <label>
-        Public business phone
-        <input name="publicPhone" defaultValue={profile.publicPhone} />
-      </label>
-      <label>
-        Website
-        <input name="website" defaultValue={profile.website} />
-      </label>
-      <div className="network-form-grid">
+
+      <section className="network-settings-section">
+        <h4>Discoverability</h4>
+        <label className="checkbox-row">
+          <input name="discoverable" type="checkbox" defaultChecked={profile.discoverable} />
+          Allow this company to appear in Discover Companies
+        </label>
+      </section>
+
+      <section className="network-settings-section">
+        <h4>Profile visibility</h4>
         <label>
-          Company size
-          <input name="companySize" defaultValue={profile.companySize} />
+          Who can view this company profile
+          <select name="visibility" defaultValue={profile.visibility}>
+            <option value="private">Private</option>
+            <option value="connections">Connections only</option>
+            <option value="public">Public (with discovery)</option>
+          </select>
+        </label>
+      </section>
+
+      <section className="network-settings-section">
+        <h4>Messaging preferences</h4>
+        <label className="checkbox-row">
+          <input name="messagingEnabled" type="checkbox" defaultChecked={profile.messagingEnabled} />
+          Allow messaging with accepted connections
+        </label>
+      </section>
+
+      <section className="network-settings-section">
+        <h4>Public contact information</h4>
+        <label>
+          Public business email
+          <input name="publicEmail" type="email" defaultValue={profile.publicEmail} />
         </label>
         <label>
-          Year established
-          <input name="yearEstablished" type="number" defaultValue={profile.yearEstablished ?? ''} />
+          Public business phone
+          <input name="publicPhone" defaultValue={profile.publicPhone} />
         </label>
-      </div>
+        <label>
+          Website
+          <input name="website" defaultValue={profile.website} />
+        </label>
+        <div className="network-form-grid">
+          <label>
+            Company size
+            <input name="companySize" defaultValue={profile.companySize} />
+          </label>
+          <label>
+            Year established
+            <input name="yearEstablished" type="number" defaultValue={profile.yearEstablished ?? ''} />
+          </label>
+        </div>
+      </section>
+
       <button type="submit" disabled={busy}>
         {busy ? 'Saving…' : 'Save settings'}
       </button>

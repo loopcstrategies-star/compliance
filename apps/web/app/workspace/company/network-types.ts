@@ -21,7 +21,7 @@ export type NetworkProfile = {
   connectionCount?: number;
   hasLogo?: boolean;
   hasCover?: boolean;
-  completion?: { done: number; total: number; percent: number };
+  completion?: { done: number; total: number; percent: number; missing?: string[] };
   connectionStatus?: string;
   connectionId?: string | null;
   canMessage?: boolean;
