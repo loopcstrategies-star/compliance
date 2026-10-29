@@ -19,7 +19,7 @@ import { FileService } from '../files/file.service';
 import { requireFile, UploadExceptionFilter, uploadOptions } from '../files/upload.filter';
 import { readPrivateFile } from '../files/storage';
 
-const ASSET_TYPES = ['logo', 'stamp', 'letterhead', 'authorised_signature'] as const;
+const ASSET_TYPES = ['logo', 'cover', 'stamp', 'letterhead', 'authorised_signature'] as const;
 type AssetType = (typeof ASSET_TYPES)[number];
 
 @Controller()

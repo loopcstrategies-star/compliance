@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { INestApplication, Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
@@ -316,7 +317,11 @@ describe('drafts and invitations', () => {
       .put(`/applications/${applicationId}/sections/kyc.entity`)
       .send({ answers: { 'kyc.entity.name': 'Should Fail' }, markComplete: false })
       .expect(409);
-    await customer.post(`/applications/${applicationId}/submit`).expect(400);
+    // Repeat submit is idempotent: returns the existing submission without creating another.
+    const repeat = await customer.post(`/applications/${applicationId}/submit`).expect(201);
+    expect(repeat.body.submissionId).toBe(submission.id);
+    expect(repeat.body.status).toBe('submitted');
+    expect(await admin.submission.count({ where: { applicationId } })).toBe(1);
 
     const employeeBoard = await employee.get(`/applications?view=requests&tenantId=${tenantA.id}`).expect(200);
     const row = employeeBoard.body.items.find((item: { id: string }) => item.id === applicationId);
@@ -469,6 +474,102 @@ describe('drafts and invitations', () => {
     expect(await admin.application.count({ where: { customer: { user: { email: 'fresh@example.com' } } } })).toBe(1);
   });
 
+  it('preserves the newest values when section saves are issued rapidly', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'rapid-save@example.com', legalName: 'Rapid Save Co', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Rapid Save' }).expect(201);
+    const draft = await customer.get('/applications/current').expect(200);
+    const applicationId = draft.body.application.id as string;
+
+    const first = customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Older Name' }, markComplete: false });
+    const second = customer
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Newest Name' }, markComplete: false });
+    const results = await Promise.all([first, second]);
+    expect(results.every((result) => result.status === 200)).toBe(true);
+
+    const resumed = await customer.get('/applications/current').expect(200);
+    expect(resumed.body.application.id).toBe(applicationId);
+    expect(resumed.body.answers['kyc.entity.name']).toBe('Newest Name');
+  });
+
+  it('resumes the same draft after a new authenticated session', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'resume-session@example.com', legalName: 'Resume Session Co', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const firstSession = request.agent(app.getHttpServer());
+    await firstSession.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Resume Session' }).expect(201);
+    const draft = await firstSession.get('/applications/current').expect(200);
+    const applicationId = draft.body.application.id as string;
+    await firstSession
+      .put(`/applications/${applicationId}/sections/kyc.entity`)
+      .send({ answers: { 'kyc.entity.name': 'Persisted After Sign-Out' }, markComplete: false })
+      .expect(200);
+    await firstSession.post('/auth/logout');
+
+    const secondSession = await login('resume-session@example.com');
+    const [again, againParallel] = await Promise.all([
+      secondSession.get('/applications/current'),
+      secondSession.get('/applications/current'),
+    ]);
+    expect(again.status).toBe(200);
+    expect(againParallel.status).toBe(200);
+    expect(again.body.application.id).toBe(applicationId);
+    expect(againParallel.body.application.id).toBe(applicationId);
+    expect(again.body.answers['kyc.entity.name']).toBe('Persisted After Sign-Out');
+    expect(await admin.application.count({ where: { customer: { user: { email: 'resume-session@example.com' } } } })).toBe(1);
+  });
+
+  it('rejects concurrent submits with a single submission and returns a deterministic repeat result', async () => {
+    const employee = await login('employee-a@example.com');
+    const created = await employee
+      .post('/invitations')
+      .send({ email: 'concurrent-submit@example.com', legalName: 'Concurrent Submit Co', customerType: 'local_company' })
+      .expect(201);
+    const token = new URL(`http://localhost${created.body.acceptPath}`).searchParams.get('token');
+    const customer = request.agent(app.getHttpServer());
+    await customer.post('/invitations/accept').send({ token, password: PASSWORD, displayName: 'Concurrent Submit' }).expect(201);
+    const draft = await customer.get('/applications/current').expect(200);
+    const applicationId = draft.body.application.id as string;
+
+    await seedSubmittableApplication(admin, customer, tenantA.id, applicationId);
+
+    const [a, b] = await Promise.all([
+      customer.post(`/applications/${applicationId}/submit`),
+      customer.post(`/applications/${applicationId}/submit`),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([201, 201]);
+    expect(a.body.submissionId).toBe(b.body.submissionId);
+    expect(a.body.status).toBe('submitted');
+    expect(b.body.status).toBe('submitted');
+    expect(await admin.submission.count({ where: { applicationId } })).toBe(1);
+
+    const repeat = await customer.post(`/applications/${applicationId}/submit`).expect(201);
+    expect(repeat.body.submissionId).toBe(a.body.submissionId);
+    expect(repeat.body.submittedAt).toBeTruthy();
+    expect(await admin.submission.count({ where: { applicationId } })).toBe(1);
+
+    const board = await employee.get(`/applications?view=requests&tenantId=${tenantA.id}`).expect(200);
+    const row = board.body.items.find((item: { id: string }) => item.id === applicationId);
+    expect(row).toBeTruthy();
+    expect(row.status).toBe('submitted');
+    expect(row.submittedAt).toBeTruthy();
+
+    const foreign = await login('employee-b@example.com');
+    await foreign.get(`/applications/${applicationId}`).expect(404);
+    await foreign.get(`/applications/${applicationId}/dossier`).expect(404);
+  });
+
   async function login(email: string) {
     const agent = request.agent(app.getHttpServer());
     const response = await agent.post('/auth/login').send({ email, password: PASSWORD });
@@ -478,6 +579,90 @@ describe('drafts and invitations', () => {
 
 
 });
+
+async function seedSubmittableApplication(
+  admin: PrismaClient,
+  customer: { get: (url: string) => request.Test },
+  tenantId: string,
+  applicationId: string,
+) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const gaps = await customer.get(`/applications/${applicationId}/completeness`).expect(200);
+    const missingAnswers = gaps.body.missingAnswers as string[];
+    const missingUploads = gaps.body.missingUploads as string[];
+    const blockedPlacements = gaps.body.blockedPlacements as string[];
+    if (missingAnswers.length === 0 && missingUploads.length === 0 && blockedPlacements.length === 0) {
+      return;
+    }
+    for (const fieldKey of missingAnswers) {
+      await admin.answer.upsert({
+        where: { applicationId_fieldKey: { applicationId, fieldKey } },
+        create: { tenantId, applicationId, fieldKey, value: 'seeded' },
+        update: { value: 'seeded' },
+      });
+    }
+    for (const fieldKey of missingUploads) {
+      const file = await admin.storedFile.create({
+        data: {
+          tenantId,
+          storageKey: `test/${applicationId}/${fieldKey}/${randomUUID()}`,
+          mediaType: 'application/pdf',
+          byteSize: 12,
+          sha256: randomUUID().replaceAll('-', ''),
+          scanStatus: 'clean',
+        },
+      });
+      await admin.document.upsert({
+        where: { applicationId_fieldKey: { applicationId, fieldKey } },
+        create: { tenantId, applicationId, fieldKey, fileId: file.id },
+        update: { fileId: file.id },
+      });
+    }
+    for (const placement of blockedPlacements) {
+      // Missing packages are reported as template ids; blocked slots as field keys.
+      if (placement.includes('.')) {
+        await admin.generatedPackage.updateMany({
+          where: { applicationId, tenantId },
+          data: { blocked: [] },
+        });
+        continue;
+      }
+      const existing = await admin.generatedPackage.findFirst({
+        where: { applicationId, templateId: placement },
+        orderBy: { version: 'desc' },
+      });
+      if (existing) {
+        continue;
+      }
+      const file = await admin.storedFile.create({
+        data: {
+          tenantId,
+          storageKey: `test/${applicationId}/pkg-${placement}-${randomUUID()}`,
+          mediaType: 'application/pdf',
+          byteSize: 12,
+          sha256: randomUUID().replaceAll('-', ''),
+          scanStatus: 'clean',
+        },
+      });
+      await admin.generatedPackage.create({
+        data: {
+          tenantId,
+          applicationId,
+          templateId: placement,
+          templateSha256: 'test',
+          version: 1,
+          fileId: file.id,
+          painted: [],
+          blocked: [],
+        },
+      });
+    }
+  }
+  const ready = await customer.get(`/applications/${applicationId}/completeness`).expect(200);
+  expect(ready.body.missingAnswers).toEqual([]);
+  expect(ready.body.missingUploads).toEqual([]);
+  expect(ready.body.blockedPlacements).toEqual([]);
+}
 
 function setCookieNames(response: request.Response): string[] {
   const header = response.headers['set-cookie'];

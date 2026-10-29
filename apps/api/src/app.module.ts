@@ -29,6 +29,8 @@ import { AdministrationService } from './administration/administration.service';
 import { CompanyKycController } from './company-kyc/company-kyc.controller';
 import { CompanyKycService } from './company-kyc/company-kyc.service';
 import { CompanyAssetsController } from './company-assets/company-assets.controller';
+import { CompanyNetworkController } from './company-network/company-network.controller';
+import { CompanyNetworkService } from './company-network/company-network.service';
 
 @Module({
   controllers: [
@@ -52,6 +54,7 @@ import { CompanyAssetsController } from './company-assets/company-assets.control
     AuditController,
     CompanyKycController,
     CompanyAssetsController,
+    CompanyNetworkController,
   ],
   providers: [
     PrismaService,
@@ -65,6 +68,7 @@ import { CompanyAssetsController } from './company-assets/company-assets.control
     OperationsService,
     AdministrationService,
     CompanyKycService,
+    CompanyNetworkService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

@@ -302,6 +302,9 @@ export class ReviewService {
     await ensureFormCatalogue(this.prisma);
     return this.prisma.withTenant(auth.tenantId, async (tx) => {
       const application = await visibleApplication(tx, auth, applicationId);
+      if (application.status === 'submitted' || application.status === 'reassessment') {
+        return this.existingSubmissionResult(tx, application);
+      }
       if (!SUBMITTABLE.has(application.status)) {
         throw new BadRequestException('This case cannot be submitted');
       }
@@ -326,18 +329,36 @@ export class ReviewService {
         }
       }
       const correcting = application.status === 'correction';
+      const nextStatus = correcting ? 'reassessment' : 'submitted';
       const [answers, documents] = await Promise.all([
         tx.answer.findMany({ where: { applicationId }, select: { fieldKey: true, value: true } }),
         tx.document.findMany({ where: { applicationId }, select: { id: true, fieldKey: true, fileId: true } }),
       ]);
       const packageIds = [...latest.values()];
-      const updated = await tx.application.update({
-        where: { id: applicationId },
+      // Conditional update: concurrent submits cannot both win the status transition.
+      const claimed = await tx.application.updateMany({
+        where: {
+          id: applicationId,
+          tenantId: auth.tenantId,
+          status: { in: [...SUBMITTABLE] },
+        },
         data: {
-          status: correcting ? 'reassessment' : 'submitted',
+          status: nextStatus,
           statusChangedAt: new Date(),
           ...(correcting ? { documentVersion: { increment: 1 } } : {}),
         },
+      });
+      if (claimed.count === 0) {
+        const raced = await tx.application.findFirst({
+          where: { id: applicationId, tenantId: auth.tenantId },
+        });
+        if (raced && (raced.status === 'submitted' || raced.status === 'reassessment')) {
+          return this.existingSubmissionResult(tx, raced);
+        }
+        throw new BadRequestException('This case cannot be submitted');
+      }
+      const updated = await tx.application.findFirstOrThrow({
+        where: { id: applicationId, tenantId: auth.tenantId },
         select: { id: true, status: true, documentVersion: true, schemaVersion: true },
       });
       const submission = await tx.submission.create({
@@ -360,6 +381,27 @@ export class ReviewService {
         submittedAt: submission.createdAt,
       };
     });
+  }
+
+  private async existingSubmissionResult(
+    tx: Prisma.TransactionClient,
+    application: { id: string; status: string; documentVersion: number },
+  ) {
+    const submission = await tx.submission.findFirst({
+      where: { applicationId: application.id, supersededAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, documentVersion: true },
+    });
+    if (!submission) {
+      throw new BadRequestException('This case cannot be submitted');
+    }
+    return {
+      id: application.id,
+      status: application.status,
+      documentVersion: application.documentVersion,
+      submissionId: submission.id,
+      submittedAt: submission.createdAt,
+    };
   }
 
   async decide(

@@ -11,6 +11,7 @@ import {
   keysForSection,
   type SectionStatus,
 } from './wizard-sections';
+import { lockCustomerForDraft } from './draft-lock';
 
 const TEMPLATE_TITLES: Record<string, string> = {
   kyc: 'Customer due diligence',
@@ -19,7 +20,16 @@ const TEMPLATE_TITLES: Record<string, string> = {
   'responsible-sourcing': 'Responsible sourcing acknowledgement',
 };
 
-const EDITABLE_STATUSES = new Set(['draft', 'correction']);
+/** Prefer these when resuming the customer's active draft/correction case. */
+const DRAFT_RESUME_STATUSES = new Set(['draft', 'correction']);
+
+/**
+ * Statuses that may receive answer writes.
+ * - draft / correction: normal customer editing
+ * - approved: material change opens reassessment via supersedeIfMaterial
+ * submitted / maker_review / checker_review / reassessment stay locked.
+ */
+const ANSWER_EDITABLE_STATUSES = new Set(['draft', 'correction', 'approved']);
 
 @Injectable()
 export class ApplicationService {
@@ -34,11 +44,13 @@ export class ApplicationService {
       if (!customer) {
         throw new NotFoundException('Not found');
       }
+      // Lock before find-or-create so concurrent GET /current cannot insert duplicate drafts.
+      await lockCustomerForDraft(tx, customer.id);
       let application = await tx.application.findFirst({
         where: {
           tenantId: auth.tenantId,
           customerId: customer.id,
-          status: { in: [...EDITABLE_STATUSES] },
+          status: { in: [...DRAFT_RESUME_STATUSES] },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -213,7 +225,7 @@ export class ApplicationService {
   }
 
   private assertEditable(status: string) {
-    if (!EDITABLE_STATUSES.has(status)) {
+    if (!ANSWER_EDITABLE_STATUSES.has(status)) {
       throw new ConflictException('This application can no longer be edited');
     }
   }
@@ -338,7 +350,7 @@ export class ApplicationService {
       sections[0]?.sectionKey ??
       null;
 
-    const editable = EDITABLE_STATUSES.has(application.status);
+    const editable = ANSWER_EDITABLE_STATUSES.has(application.status);
     const submittedAt = application.submissions[0]?.createdAt ?? null;
 
     return {

@@ -9,9 +9,12 @@ const OPEN = new Set(['draft', 'correction']);
 export function SubmitCase({
   draft,
   incompleteSections = [],
+  onBeforeSubmit,
 }: {
   draft: Draft;
   incompleteSections?: string[];
+  /** Flush pending autosaves before POST /submit. Return false to abort. */
+  onBeforeSubmit?: () => Promise<boolean>;
 }) {
   const router = useRouter();
   const [error, setError] = useState('');
@@ -26,6 +29,13 @@ export function SubmitCase({
     setError('');
     setSubmitting(true);
     try {
+      if (onBeforeSubmit) {
+        const ready = await onBeforeSubmit();
+        if (!ready) {
+          setError('Your latest answers could not be saved. Fix the save error, then try submitting again.');
+          return;
+        }
+      }
       const response = await fetch(`/api/applications/${draft.application.id}/submit`, { method: 'POST' });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
@@ -44,6 +54,8 @@ export function SubmitCase({
       }
       router.push('/portal/submitted');
       router.refresh();
+    } catch {
+      setError('The case was not submitted. Check your connection and try again.');
     } finally {
       setSubmitting(false);
     }

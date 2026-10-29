@@ -7,6 +7,7 @@ import { redact } from '../common/redact';
 import { CUSTOMER_TYPES, INVITATION_TTL_MS, type CustomerType } from '../domain';
 import { hashPassword, AuthService } from '../auth/auth.service';
 import type { AuthState } from '../auth/auth.types';
+import { lockCustomerForDraft } from '../applications/draft-lock';
 
 const INVALID = 'Invitation is not valid';
 export const SIGN_OUT_REQUIRED =
@@ -190,6 +191,7 @@ async function ensureDraft(
   if (customer.tenantId !== invitation.tenantId) {
     throw new ForbiddenException('Tenant mismatch');
   }
+  await lockCustomerForDraft(tx, customer.id);
   const application = await tx.application.findFirst({
     where: { tenantId: invitation.tenantId, customerId: customer.id },
     select: { id: true },
