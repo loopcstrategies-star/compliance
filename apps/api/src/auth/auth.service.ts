@@ -127,7 +127,7 @@ export class AuthService {
         }
       }
       const totp = new OTPAuth.TOTP({
-        issuer: 'MYKA',
+        issuer: 'LoopC',
         label: user.email,
         algorithm: 'SHA1',
         digits: 6,

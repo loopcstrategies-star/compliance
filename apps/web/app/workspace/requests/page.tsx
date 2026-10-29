@@ -34,7 +34,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             status: item.status,
             legalName: item.legalName,
             customerType: item.customerType,
-            submittedAt: (item as { submittedAt?: string | null }).submittedAt ?? null,
+            submittedAt: item.submittedAt ?? null,
           }))}
         />
       ) : (

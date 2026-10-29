@@ -175,16 +175,25 @@ describe('maker checker workflow', () => {
       .expect(201);
     const approved = await customer.get(`/applications/${applicationA.id}`).expect(200);
     expect(approved.body.application.status).toBe('approved');
+    expect(approved.body.editable).toBe(true);
     const file = await admin.storedFile.findFirstOrThrow({
       where: { packages: { some: { applicationId: applicationA.id } } },
       orderBy: { createdAt: 'desc' },
     });
-    await customer
+    const materialEdit = await customer
       .put(`/applications/${applicationA.id}/answers`)
       .send({ answers: { 'kyc.entity.name': 'Review Metals LLC' } })
       .expect(200);
+    expect(materialEdit.body.message).not.toBe('This application can no longer be edited');
+    expect(materialEdit.body.application.status).toBe('reassessment');
     const reopened = await customer.get(`/applications/${applicationA.id}`).expect(200);
     expect(reopened.body.application.status).toBe('reassessment');
+    expect(reopened.body.editable).toBe(false);
+    const blocked = await customer
+      .put(`/applications/${applicationA.id}/answers`)
+      .send({ answers: { 'kyc.entity.name': 'Should not apply' } })
+      .expect(409);
+    expect(blocked.body.message).toBe('This application can no longer be edited');
     const unchanged = await admin.storedFile.findUniqueOrThrow({ where: { id: file.id } });
     expect(unchanged.sha256).toBe(file.sha256);
     expect(applicationC.id).toBeTruthy();

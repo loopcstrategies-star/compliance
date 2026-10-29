@@ -42,6 +42,9 @@ model Tenant {
   companyKycProfile CompanyKycProfile?
   companyAssets TenantCompanyAsset[]
   sectionProgress ApplicationSectionProgress[]
+  networkProfile CompanyNetworkProfile?
+  connectionsRequested CompanyConnection[] @relation("ConnectionRequester")
+  connectionsReceived CompanyConnection[] @relation("ConnectionAddressee")
 
   @@map("tenants")
 }
@@ -467,6 +470,7 @@ model Submission {
   application     Application      @relation(fields: [applicationId], references: [id])
   decisions       ReviewDecision[]
 
+  @@unique([applicationId, documentVersion])
   @@index([tenantId])
   @@index([applicationId])
   @@map("submissions")
@@ -602,4 +606,84 @@ model TenantCompanyAsset {
   @@unique([tenantId, assetType])
   @@index([tenantId])
   @@map("tenant_company_assets")
+}
+
+model CompanyNetworkProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @unique @map("tenant_id") @db.Uuid
+  headline           String   @default("")
+  introduction       String   @default("")
+  industry           String   @default("")
+  businessCategories Json     @default("[]") @map("business_categories")
+  city               String   @default("")
+  country            String   @default("")
+  website            String   @default("")
+  publicEmail        String   @default("") @map("public_email")
+  publicPhone        String   @default("") @map("public_phone")
+  productsServices   String   @default("") @map("products_services")
+  capabilities       String   @default("")
+  companySize        String   @default("") @map("company_size")
+  yearEstablished    Int?     @map("year_established")
+  discoverable       Boolean  @default(false)
+  visibility         String   @default("private")
+  messagingEnabled   Boolean  @default(true) @map("messaging_enabled")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([discoverable, industry, country, city])
+  @@map("company_network_profiles")
+}
+
+model CompanyConnection {
+  id                 String              @id @default(uuid()) @db.Uuid
+  requesterTenantId  String              @map("requester_tenant_id") @db.Uuid
+  addresseeTenantId  String              @map("addressee_tenant_id") @db.Uuid
+  tenantLowId        String              @map("tenant_low_id") @db.Uuid
+  tenantHighId       String              @map("tenant_high_id") @db.Uuid
+  status             String
+  requestedByUserId  String              @map("requested_by_user_id") @db.Uuid
+  respondedByUserId  String?             @map("responded_by_user_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  respondedAt        DateTime?           @map("responded_at")
+  requesterTenant    Tenant              @relation("ConnectionRequester", fields: [requesterTenantId], references: [id])
+  addresseeTenant    Tenant              @relation("ConnectionAddressee", fields: [addresseeTenantId], references: [id])
+  conversation       CompanyConversation?
+
+  @@unique([tenantLowId, tenantHighId])
+  @@index([requesterTenantId, status])
+  @@index([addresseeTenantId, status])
+  @@map("company_connections")
+}
+
+model CompanyConversation {
+  id            String           @id @default(uuid()) @db.Uuid
+  connectionId  String           @unique @map("connection_id") @db.Uuid
+  tenantLowId   String           @map("tenant_low_id") @db.Uuid
+  tenantHighId  String           @map("tenant_high_id") @db.Uuid
+  lastMessageAt DateTime?        @map("last_message_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  connection    CompanyConnection @relation(fields: [connectionId], references: [id])
+  messages      CompanyMessage[]
+
+  @@index([tenantLowId])
+  @@index([tenantHighId])
+  @@map("company_conversations")
+}
+
+model CompanyMessage {
+  id              String              @id @default(uuid()) @db.Uuid
+  conversationId  String              @map("conversation_id") @db.Uuid
+  senderTenantId  String              @map("sender_tenant_id") @db.Uuid
+  senderUserId    String              @map("sender_user_id") @db.Uuid
+  body            String
+  createdAt       DateTime            @default(now()) @map("created_at")
+  readAt          DateTime?           @map("read_at")
+  conversation    CompanyConversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([senderTenantId, readAt])
+  @@map("company_messages")
 }

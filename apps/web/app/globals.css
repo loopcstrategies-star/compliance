@@ -1489,3 +1489,360 @@ table.queue th {
   padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
 }
+
+.company-network-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.company-network-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.company-network-nav a.is-active,
+.company-network-nav a:hover,
+.company-network-nav a:focus-visible {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.company-admin-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.unread-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.network-panel,
+.network-profile,
+.network-form,
+.network-connections .panel {
+  margin-top: 0.5rem;
+}
+
+.network-cover {
+  height: 10rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(30, 64, 175, 0.22));
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 1rem;
+}
+
+.network-profile-head {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.network-logo {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.network-logo--placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--navy);
+  background: rgba(15, 118, 110, 0.1);
+}
+
+.network-profile-head h3,
+.network-profile-body h4 {
+  margin: 0 0 0.35rem;
+  color: var(--navy);
+}
+
+.muted-line {
+  margin: 0.2rem 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.completion-meter {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  color: var(--navy);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.completion-meter span {
+  display: block;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  overflow: hidden;
+}
+
+.completion-meter i {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+
+.network-form,
+.network-search {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.network-form-grid,
+.network-search {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  align-items: end;
+}
+
+.network-form label,
+.network-search label,
+.message-composer label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+
+.company-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.company-network-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.company-network-card-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.company-network-card-head img {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.55rem;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.company-network-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.company-network-card h3 a {
+  color: var(--navy);
+  text-decoration: none;
+}
+
+.company-network-card p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+}
+
+.connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.button-secondary,
+button.button-secondary {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--line);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(30, 64, 175, 0.1);
+  color: var(--navy);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.status-chip--connected {
+  background: rgba(15, 118, 110, 0.14);
+  color: var(--teal);
+}
+
+.network-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.network-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.network-list li:last-child {
+  border-bottom: 0;
+}
+
+.network-pagination {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.messages-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.messages-list ul {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.messages-list button {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.2rem;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.messages-list button.is-active {
+  border-color: var(--teal);
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.messages-list button span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-history {
+  display: grid;
+  gap: 0.75rem;
+  min-height: 16rem;
+  max-height: 28rem;
+  overflow: auto;
+  padding: 0.5rem 0;
+}
+
+.message-history article {
+  max-width: 80%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.message-history article.mine {
+  justify-self: end;
+  background: rgba(15, 118, 110, 0.08);
+  border-color: rgba(15, 118, 110, 0.25);
+}
+
+.message-history article.theirs {
+  justify-self: start;
+}
+
+.message-history header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.message-history p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.message-composer {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .messages-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .network-profile-head {
+    flex-direction: column;
+  }
+
+  .network-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

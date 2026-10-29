@@ -19,11 +19,11 @@ export const PRIVILEGED_ROLES = new Set<string>([
 
 export const ROLE_PERMISSIONS: Record<RoleKey, string[]> = {
   customer: ['portal.access', 'application.read', 'application.write', 'document.upload', 'document.read', 'package.generate', 'application.submit'],
-  employee: ['employee.access', 'user.read', 'user.update', 'invitation.create', 'application.read', 'dashboard.read', 'report.export', 'application.assign'],
-  maker: ['compliance.access', 'user.read', 'invitation.create', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'package.generate', 'review.maker'],
-  checker: ['compliance.access', 'user.read', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'review.checker'],
-  authorised_approver: ['compliance.access', 'user.read', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'review.approve'],
-  super_admin: ['admin.access', 'tenant.manage', 'user.read', 'checklist.configure', 'application.read', 'invitation.create', 'letterhead.configure', 'workflow.configure', 'operations.configure', 'role.assign', 'retention.configure', 'retention.approve', 'audit.read'],
+  employee: ['employee.access', 'user.read', 'user.update', 'invitation.create', 'application.read', 'dashboard.read', 'report.export', 'application.assign', 'company_network.read', 'company_network.write'],
+  maker: ['compliance.access', 'user.read', 'invitation.create', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'package.generate', 'review.maker', 'company_network.read', 'company_network.write'],
+  checker: ['compliance.access', 'user.read', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'review.checker', 'company_network.read', 'company_network.write'],
+  authorised_approver: ['compliance.access', 'user.read', 'application.read', 'application.write', 'document.upload', 'document.read', 'identity_file.read', 'review.approve', 'company_network.read', 'company_network.write'],
+  super_admin: ['admin.access', 'tenant.manage', 'user.read', 'checklist.configure', 'application.read', 'invitation.create', 'letterhead.configure', 'workflow.configure', 'operations.configure', 'role.assign', 'retention.configure', 'retention.approve', 'audit.read', 'company_network.read', 'company_network.write'],
 };
 
 export const PERMISSION_KEYS = [
@@ -56,6 +56,8 @@ export const PERMISSION_KEYS = [
   'retention.configure',
   'retention.approve',
   'audit.read',
+  'company_network.read',
+  'company_network.write',
 ] as const;
 
 export const STAFF_ROLES = ['employee', 'maker', 'checker', 'authorised_approver', 'super_admin'] as const;

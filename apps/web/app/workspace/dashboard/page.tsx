@@ -151,7 +151,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <article className="company-card" id="overview">
               <header className="panel-head">
                 <h3><Icon name="building" /> Company profile</h3>
-                {canManage ? <a href="/workspace/company">Manage</a> : null}
+                <a href="/workspace/company/my">Manage</a>
               </header>
               <p><strong>{company}</strong></p>
               <ul className="readiness">
