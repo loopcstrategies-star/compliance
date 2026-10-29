@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 
 export async function resetTenantData(admin: PrismaClient): Promise<void> {
+  await admin.companyNotification.deleteMany();
+  await admin.companyPostReaction.deleteMany();
+  await admin.companyPostComment.deleteMany();
+  await admin.companyPost.deleteMany();
+  await admin.memberNetworkProfile.deleteMany();
   await admin.companyMessage.deleteMany();
   await admin.companyConversation.deleteMany();
   await admin.companyConnection.deleteMany();

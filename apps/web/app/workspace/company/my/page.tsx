@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { apiGet } from '../../../../lib/api';
 import { requireArea } from '../../../../lib/session';
 import { CompanyShell } from '../company-shell';
+import { FeedClient } from '../feed-client';
+import { MemberProfileEditor } from '../member-profile-editor';
 import { ProfileEditor } from '../profile-editor';
 import type { NetworkProfile } from '../network-types';
 
@@ -100,6 +102,8 @@ export default async function MyCompanyPage() {
               <Link href="/workspace/company/settings">Manage visibility and messaging preferences</Link>
             </p>
           </div>
+          <MemberProfileEditor />
+          <FeedClient compose tenantId={profile.tenantId} />
         </section>
       )}
     </CompanyShell>

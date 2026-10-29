@@ -31,6 +31,7 @@ import { CompanyKycService } from './company-kyc/company-kyc.service';
 import { CompanyAssetsController } from './company-assets/company-assets.controller';
 import { CompanyNetworkController } from './company-network/company-network.controller';
 import { CompanyNetworkService } from './company-network/company-network.service';
+import { CompanyNetworkSocialService } from './company-network/company-network-social.service';
 
 @Module({
   controllers: [
@@ -69,6 +70,7 @@ import { CompanyNetworkService } from './company-network/company-network.service
     AdministrationService,
     CompanyKycService,
     CompanyNetworkService,
+    CompanyNetworkSocialService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

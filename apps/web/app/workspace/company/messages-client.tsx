@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ConversationRow, MessageRow } from './network-types';
 
 export function MessagesClient({
@@ -16,18 +16,41 @@ export function MessagesClient({
   const [body, setBody] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
   const active = conversations.find((row) => row.id === activeId);
 
-  async function loadMessages(conversationId: string) {
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return conversations;
+    }
+    return conversations.filter((row) =>
+      [row.peerName, row.lastMessage?.body].filter(Boolean).join(' ').toLowerCase().includes(needle),
+    );
+  }, [conversations, query]);
+
+  async function loadConversations() {
+    const response = await fetch('/api/company-network/conversations');
+    if (!response.ok) {
+      return;
+    }
+    setConversations(await response.json());
+  }
+
+  async function loadMessages(conversationId: string, silent = false) {
     if (!conversationId) {
       setMessages([]);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError('');
     const response = await fetch(`/api/company-network/conversations/${conversationId}/messages`);
     if (!response.ok) {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
       setError('Messages could not be loaded.');
       return;
     }
@@ -37,11 +60,24 @@ export function MessagesClient({
     setConversations((rows) =>
       rows.map((row) => (row.id === conversationId ? { ...row, unreadCount: 0 } : row)),
     );
-    setLoading(false);
+    if (!silent) {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     void loadMessages(activeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void loadConversations();
+      if (activeId) {
+        void loadMessages(activeId, true);
+      }
+    }, 15000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -85,9 +121,13 @@ export function MessagesClient({
     <div className="messages-layout">
       <aside className="panel messages-list">
         <h3>Conversations</h3>
-        {conversations.length === 0 ? <p className="notice">No conversations yet. Connect with a company first.</p> : null}
+        <label>
+          Search
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search conversations" />
+        </label>
+        {filtered.length === 0 ? <p className="notice">No conversations yet. Connect with a company first.</p> : null}
         <ul>
-          {conversations.map((row) => (
+          {filtered.map((row) => (
             <li key={row.id}>
               <button
                 type="button"

@@ -1733,6 +1733,44 @@ table.queue th {
   min-inline-size: 0;
 }
 
+.network-feed-comment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.network-member-block {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.network-notify {
+  position: relative;
+}
+
+.network-notify > button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0;
+}
+
+.network-notify-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 20;
+  width: min(22rem, 80vw);
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
 .network-editor-tabs {
   display: flex;
   flex-wrap: wrap;

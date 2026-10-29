@@ -4,9 +4,13 @@ import { apiGet } from '../../../lib/api';
 import type { Me } from '../../../lib/session';
 import { CompanyNetworkNav } from './company-network-nav';
 import { NetworkSearch } from './network-search';
+import { NotificationsBell } from './notifications-bell';
 
 export async function CompanyShell({ me, children }: { me: Me; children: ReactNode }) {
-  const unread = await apiGet<{ count: number }>('/company-network/unread-count');
+  const [unread, notificationUnread] = await Promise.all([
+    apiGet<{ count: number }>('/company-network/unread-count'),
+    apiGet<{ count: number }>('/company-network/notifications/unread-count'),
+  ]);
   const isSuperAdmin = me.roles.includes('super_admin');
 
   return (
@@ -20,6 +24,7 @@ export async function CompanyShell({ me, children }: { me: Me; children: ReactNo
           </div>
         </div>
         <div className="network-shell-tools">
+          <NotificationsBell initialCount={notificationUnread?.count ?? 0} />
           <Link
             className="network-shell-icon-link"
             href="/workspace/company/messages"
