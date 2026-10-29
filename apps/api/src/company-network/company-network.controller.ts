@@ -23,6 +23,12 @@ import { CompanyNetworkService } from './company-network.service';
 export class CompanyNetworkController {
   constructor(private readonly network: CompanyNetworkService) {}
 
+  @Get('home')
+  @RequirePermissions('company_network.read')
+  home(@Req() req: AuthedRequest) {
+    return this.network.getHome(req.auth!);
+  }
+
   @Get('me')
   @RequirePermissions('company_network.read')
   me(@Req() req: AuthedRequest) {

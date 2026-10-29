@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { apiGet } from '../../../../lib/api';
 import { requireArea } from '../../../../lib/session';
 import { CompanyShell } from '../company-shell';
@@ -24,7 +25,21 @@ export default async function MyCompanyPage() {
                 ? `url(/api/company-network/companies/${profile.tenantId}/cover)`
                 : undefined,
             }}
-          />
+          >
+            {profile.website ? (
+              <span className="network-cover-badge">
+                {(() => {
+                  try {
+                    return new URL(
+                      profile.website.startsWith('http') ? profile.website : `https://${profile.website}`,
+                    ).hostname;
+                  } catch {
+                    return profile.website;
+                  }
+                })()}
+              </span>
+            ) : null}
+          </div>
           <div className="network-profile-head">
             {profile.hasLogo ? (
               <img
@@ -41,21 +56,21 @@ export default async function MyCompanyPage() {
               <h3>{profile.companyName}</h3>
               <p>{profile.headline || 'Add a headline to introduce your company.'}</p>
               <p className="muted-line">
-                {[profile.industry, profile.city, profile.country].filter(Boolean).join(' · ') || 'Location not set'}
+                {[profile.industry, ...(profile.businessCategories ?? []).slice(0, 2), profile.city, profile.country]
+                  .filter(Boolean)
+                  .join(' · ') || 'Location not set'}
               </p>
               <p className="muted-line">
-                Visibility: {profile.visibility}
-                {profile.discoverable ? ' · Discoverable' : ' · Hidden from discovery'}
-                {typeof profile.connectionCount === 'number' ? ` · ${profile.connectionCount} connections` : ''}
+                <span className="status-chip">{profile.visibility}</span>{' '}
+                {profile.discoverable ? (
+                  <span className="status-chip status-chip--connected">Discoverable</span>
+                ) : (
+                  <span className="status-chip">Hidden from discovery</span>
+                )}
+                {typeof profile.connectionCount === 'number'
+                  ? ` · ${profile.connectionCount} connections`
+                  : ''}
               </p>
-              {profile.completion ? (
-                <p className="completion-meter" aria-label={`Profile ${profile.completion.percent}% complete`}>
-                  Profile completion {profile.completion.percent}%
-                  <span>
-                    <i style={{ width: `${profile.completion.percent}%` }} />
-                  </span>
-                </p>
-              ) : null}
             </div>
           </div>
           <ProfileEditor profile={profile} />
@@ -73,11 +88,17 @@ export default async function MyCompanyPage() {
             </p>
             {(profile.companySize || profile.yearEstablished) && (
               <p className="muted-line">
-                {[profile.companySize ? `Size ${profile.companySize}` : '', profile.yearEstablished ? `Est. ${profile.yearEstablished}` : '']
+                {[
+                  profile.companySize ? `Size ${profile.companySize}` : '',
+                  profile.yearEstablished ? `Est. ${profile.yearEstablished}` : '',
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </p>
             )}
+            <p className="muted-line">
+              <Link href="/workspace/company/settings">Manage visibility and messaging preferences</Link>
+            </p>
           </div>
         </section>
       )}

@@ -23,9 +23,10 @@ export const STAFF_TABS = [
 ] as const;
 
 export const COMPANY_NETWORK_TABS = [
+  { href: '/workspace/company', label: 'Network Home' },
   { href: '/workspace/company/my', label: 'My Company' },
   { href: '/workspace/company/discover', label: 'Discover Companies' },
-  { href: '/workspace/company/connections', label: 'Connections' },
+  { href: '/workspace/company/connections', label: 'My Network' },
   { href: '/workspace/company/messages', label: 'Messages' },
   { href: '/workspace/company/settings', label: 'Company Settings' },
 ] as const;

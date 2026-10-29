@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ConnectionActions } from './connection-actions';
 import type { NetworkProfile } from './network-types';
 
@@ -14,35 +15,43 @@ type DiscoverResponse = {
 };
 
 export function DiscoverClient() {
-  const [q, setQ] = useState('');
-  const [country, setCountry] = useState('');
-  const [city, setCity] = useState('');
-  const [industry, setIndustry] = useState('');
+  const searchParams = useSearchParams();
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
+  const [country, setCountry] = useState(searchParams.get('country') ?? '');
+  const [city, setCity] = useState(searchParams.get('city') ?? '');
+  const [industry, setIndustry] = useState(searchParams.get('industry') ?? '');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<DiscoverResponse | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  async function load(nextPage = page) {
-    setLoading(true);
-    setError('');
-    const params = new URLSearchParams({
-      page: String(nextPage),
-      pageSize: '12',
-      ...(q ? { q } : {}),
-      ...(country ? { country } : {}),
-      ...(city ? { city } : {}),
-      ...(industry ? { industry } : {}),
-    });
-    const response = await fetch(`/api/company-network/discover?${params.toString()}`);
-    setLoading(false);
-    if (!response.ok) {
-      setError('Company discovery is unavailable right now.');
-      setData(null);
-      return;
-    }
-    setData(await response.json());
-  }
+  const load = useCallback(
+    async (nextPage = page, overrides?: { q?: string; country?: string; city?: string; industry?: string }) => {
+      setLoading(true);
+      setError('');
+      const nextQ = overrides?.q ?? q;
+      const nextCountry = overrides?.country ?? country;
+      const nextCity = overrides?.city ?? city;
+      const nextIndustry = overrides?.industry ?? industry;
+      const params = new URLSearchParams({
+        page: String(nextPage),
+        pageSize: '12',
+        ...(nextQ ? { q: nextQ } : {}),
+        ...(nextCountry ? { country: nextCountry } : {}),
+        ...(nextCity ? { city: nextCity } : {}),
+        ...(nextIndustry ? { industry: nextIndustry } : {}),
+      });
+      const response = await fetch(`/api/company-network/discover?${params.toString()}`);
+      setLoading(false);
+      if (!response.ok) {
+        setError('Company discovery is unavailable right now.');
+        setData(null);
+        return;
+      }
+      setData(await response.json());
+    },
+    [page, q, country, city, industry],
+  );
 
   useEffect(() => {
     void load(1);
@@ -57,10 +66,18 @@ export function DiscoverClient() {
 
   return (
     <section className="panel network-panel">
+      <div className="network-section-head">
+        <h3>Discover Companies</h3>
+        {data ? <span className="muted-line">{data.total} companies</span> : null}
+      </div>
       <form className="network-search" onSubmit={onSearch}>
         <label>
-          Company name
-          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search companies" />
+          Keywords
+          <input
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            placeholder="Name, industry, products, or services"
+          />
         </label>
         <label>
           Country
@@ -74,10 +91,19 @@ export function DiscoverClient() {
           Industry
           <input value={industry} onChange={(event) => setIndustry(event.target.value)} />
         </label>
-        <button type="submit">Search</button>
+        <button type="submit" disabled={loading}>
+          Search
+        </button>
       </form>
       {loading ? <p className="notice">Loading companies…</p> : null}
-      {error ? <p className="notice error">{error}</p> : null}
+      {error ? (
+        <p className="notice error">
+          {error}{' '}
+          <button type="button" className="button-secondary" onClick={() => void load(page)}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       {!loading && data && data.items.length === 0 ? (
         <p className="notice">No discoverable companies match these filters.</p>
       ) : null}
@@ -102,11 +128,20 @@ export function DiscoverClient() {
             <p className="muted-line">
               {[company.industry, company.city, company.country].filter(Boolean).join(' · ') || 'Location not set'}
             </p>
-            <ConnectionActions
-              tenantId={company.tenantId}
-              connectionId={company.connectionId}
-              status={company.connectionStatus}
-            />
+            <p className="muted-line">
+              {(company.introduction || company.productsServices || '').slice(0, 140) || 'No description published.'}
+            </p>
+            <div className="connection-actions">
+              <a className="button-link button-link--outline" href={`/workspace/company/discover/${company.tenantId}`}>
+                View profile
+              </a>
+              <ConnectionActions
+                tenantId={company.tenantId}
+                connectionId={company.connectionId}
+                status={company.connectionStatus}
+                onChanged={() => void load(page)}
+              />
+            </div>
           </article>
         ))}
       </div>

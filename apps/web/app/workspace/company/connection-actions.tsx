@@ -1,24 +1,33 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export function ConnectionActions({
   tenantId,
   connectionId,
   status,
   canMessage,
+  onChanged,
 }: {
   tenantId: string;
   connectionId?: string | null;
   status?: string;
   canMessage?: boolean;
+  onChanged?: () => void;
 }) {
   const router = useRouter();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [localStatus, setLocalStatus] = useState(status);
+  const [localConnectionId, setLocalConnectionId] = useState(connectionId);
 
-  async function run(path: string, body?: Record<string, unknown>) {
+  useEffect(() => {
+    setLocalStatus(status);
+    setLocalConnectionId(connectionId);
+  }, [status, connectionId]);
+
+  async function run(path: string, body?: Record<string, unknown>, nextStatus?: string) {
     setBusy(true);
     setError('');
     const response = await fetch(path, {
@@ -32,57 +41,82 @@ export function ConnectionActions({
       setError(payload?.message ?? 'The action could not be completed.');
       return;
     }
+    const payload = await response.json().catch(() => null);
+    if (payload?.id) {
+      setLocalConnectionId(payload.id);
+    }
+    if (nextStatus) {
+      setLocalStatus(nextStatus);
+    }
+    onChanged?.();
     router.refresh();
   }
 
+  const current = localStatus ?? status;
+
   return (
     <div className="connection-actions">
-      {status === 'none' || status === 'declined' || status === 'cancelled' || status === 'disconnected' ? (
-        <button type="button" disabled={busy} onClick={() => run('/api/company-network/requests', { tenantId })}>
-          Send Connection Request
+      {current === 'none' || current === 'declined' || current === 'cancelled' || current === 'disconnected' ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run('/api/company-network/requests', { tenantId }, 'pending_outgoing')}
+        >
+          Connect
         </button>
       ) : null}
-      {status === 'pending_outgoing' && connectionId ? (
-        <button type="button" disabled={busy} onClick={() => run(`/api/company-network/requests/${connectionId}/cancel`)}>
-          Cancel Request
+      {current === 'pending_outgoing' && localConnectionId ? (
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={busy}
+          onClick={() => run(`/api/company-network/requests/${localConnectionId}/cancel`, undefined, 'cancelled')}
+        >
+          Cancel request
         </button>
       ) : null}
-      {status === 'pending_incoming' && connectionId ? (
+      {current === 'pending_incoming' && localConnectionId ? (
         <>
-          <button type="button" disabled={busy} onClick={() => run(`/api/company-network/requests/${connectionId}/accept`)}>
-            Accept Request
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(`/api/company-network/requests/${localConnectionId}/accept`, undefined, 'connected')}
+          >
+            Accept
           </button>
           <button
             type="button"
             className="button-secondary"
             disabled={busy}
-            onClick={() => run(`/api/company-network/requests/${connectionId}/decline`)}
+            onClick={() => run(`/api/company-network/requests/${localConnectionId}/decline`, undefined, 'declined')}
           >
             Decline
           </button>
         </>
       ) : null}
-      {status === 'connected' ? (
+      {current === 'connected' ? (
         <>
           <span className="status-chip status-chip--connected">Connected</span>
-          {canMessage ? (
-            <a className="button-link" href={`/workspace/company/messages?peer=${tenantId}`}>
+          {canMessage !== false ? (
+            <a className="button-link button-link--outline" href={`/workspace/company/messages?peer=${tenantId}`}>
               Message
             </a>
           ) : null}
-          {connectionId ? (
+          {localConnectionId ? (
             <button
               type="button"
               className="button-secondary"
               disabled={busy}
-              onClick={() => run(`/api/company-network/requests/${connectionId}/disconnect`)}
+              onClick={() =>
+                run(`/api/company-network/requests/${localConnectionId}/disconnect`, undefined, 'disconnected')
+              }
             >
               Disconnect
             </button>
           ) : null}
         </>
       ) : null}
-      {status === 'pending_outgoing' ? <span className="status-chip">Pending</span> : null}
+      {current === 'pending_outgoing' ? <span className="status-chip">Pending</span> : null}
       {error ? <p className="notice error">{error}</p> : null}
     </div>
   );

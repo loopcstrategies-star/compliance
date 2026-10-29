@@ -9,6 +9,7 @@ export default async function PeerCompanyPage({ params }: { params: Promise<{ te
   const me = await requireArea(['employee', 'maker', 'checker', 'authorised_approver', 'super_admin']);
   const { tenantId } = await params;
   const profile = await apiGet<NetworkProfile>(`/company-network/companies/${tenantId}`);
+  const isOwn = profile?.tenantId === me.tenantId;
 
   return (
     <CompanyShell me={me}>
@@ -26,7 +27,21 @@ export default async function PeerCompanyPage({ params }: { params: Promise<{ te
                 ? `url(/api/company-network/companies/${profile.tenantId}/cover)`
                 : undefined,
             }}
-          />
+          >
+            {profile.website ? (
+              <span className="network-cover-badge">
+                {(() => {
+                  try {
+                    return new URL(
+                      profile.website.startsWith('http') ? profile.website : `https://${profile.website}`,
+                    ).hostname;
+                  } catch {
+                    return profile.website;
+                  }
+                })()}
+              </span>
+            ) : null}
+          </div>
           <div className="network-profile-head">
             {profile.hasLogo ? (
               <img
@@ -43,14 +58,39 @@ export default async function PeerCompanyPage({ params }: { params: Promise<{ te
               <h3>{profile.companyName}</h3>
               <p>{profile.headline || 'No headline'}</p>
               <p className="muted-line">
-                {[profile.industry, profile.city, profile.country].filter(Boolean).join(' · ')}
+                {[
+                  profile.industry,
+                  ...(profile.businessCategories ?? []).slice(0, 2),
+                  profile.city,
+                  profile.country,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
-              <ConnectionActions
-                tenantId={profile.tenantId}
-                connectionId={profile.connectionId}
-                status={profile.connectionStatus}
-                canMessage={profile.canMessage}
-              />
+              {(profile.companySize || profile.yearEstablished) && (
+                <p className="muted-line">
+                  {[
+                    profile.companySize ? `Size ${profile.companySize}` : '',
+                    profile.yearEstablished ? `Est. ${profile.yearEstablished}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
+              {isOwn ? (
+                <div className="network-editor-actions">
+                  <Link className="button-link" href="/workspace/company/my">
+                    Edit your company
+                  </Link>
+                </div>
+              ) : (
+                <ConnectionActions
+                  tenantId={profile.tenantId}
+                  connectionId={profile.connectionId}
+                  status={profile.connectionStatus}
+                  canMessage={profile.canMessage}
+                />
+              )}
             </div>
           </div>
           <div className="network-profile-body">
