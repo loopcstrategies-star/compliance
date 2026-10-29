@@ -10,6 +10,7 @@ import type { AuthState } from '../auth/auth.types';
 import { FileService } from '../files/file.service';
 import { PrismaService, type Tx } from '../prisma/prisma.service';
 import { readPrivateFile } from '../files/storage';
+import { CompanyNetworkSocialService } from './company-network-social.service';
 
 const VISIBILITY = new Set(['private', 'connections', 'public']);
 const MAX_MESSAGE_LENGTH = 4000;
@@ -24,6 +25,7 @@ export class CompanyNetworkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FileService,
+    private readonly social: CompanyNetworkSocialService,
   ) {}
 
   async getMyProfile(auth: AuthState) {
@@ -144,12 +146,14 @@ export class CompanyNetworkService {
 
   async getHome(auth: AuthState) {
     await this.assertEligibleTenant(auth.tenantId);
-    const [profile, suggestions, received, conversations, unread] = await Promise.all([
+    const [profile, suggestions, received, conversations, unread, feed, notificationUnread] = await Promise.all([
       this.getMyProfile(auth),
       this.discover(auth, { page: '1', pageSize: '6' }),
       this.listReceived(auth),
       this.listConversations(auth),
       this.unreadCount(auth),
+      this.social.listFeed(auth, { page: '1', pageSize: '5' }),
+      this.social.unreadNotificationCount(auth),
     ]);
     return {
       profile,
@@ -160,6 +164,8 @@ export class CompanyNetworkService {
       recentConversations: conversations.slice(0, 5),
       unreadCount: unread.count,
       connectionCount: typeof profile.connectionCount === 'number' ? profile.connectionCount : 0,
+      activity: feed.items,
+      notificationUnreadCount: notificationUnread.count,
     };
   }
 
@@ -398,7 +404,7 @@ export class CompanyNetworkService {
     }
     const [low, high] = orderedPair(auth.tenantId, targetTenantId);
 
-    return this.prisma.withTenant(auth.tenantId, async (tx) => {
+    const dto = await this.prisma.withTenant(auth.tenantId, async (tx) => {
       const existing = await tx.companyConnection.findUnique({
         where: { tenantLowId_tenantHighId: { tenantLowId: low, tenantHighId: high } },
       });
@@ -462,6 +468,14 @@ export class CompanyNetworkService {
         throw error;
       }
     });
+    await this.social.notifyUsers(
+      targetTenantId,
+      'all-staff',
+      'connection_request',
+      { connectionId: dto.id, fromTenantId: auth.tenantId, href: '/workspace/company/connections' },
+      'connections',
+    );
+    return dto;
   }
 
   async listConnections(auth: AuthState) {
@@ -502,7 +516,7 @@ export class CompanyNetworkService {
 
   async accept(auth: AuthState, connectionId: string) {
     await this.assertEligibleTenant(auth.tenantId);
-    return this.prisma.withTenant(auth.tenantId, async (tx) => {
+    const result = await this.prisma.withTenant(auth.tenantId, async (tx) => {
       const connection = await tx.companyConnection.findUnique({ where: { id: connectionId } });
       if (!connection || connection.addresseeTenantId !== auth.tenantId) {
         throw new ForbiddenException('Only the recipient can accept this request');
@@ -536,8 +550,20 @@ export class CompanyNetworkService {
           targetId: connectionId,
         },
       });
-      return this.connectionDto(auth.tenantId, updated);
+      return {
+        dto: this.connectionDto(auth.tenantId, updated),
+        requesterTenantId: connection.requesterTenantId,
+        requestedByUserId: connection.requestedByUserId,
+      };
     });
+    await this.social.notifyUsers(
+      result.requesterTenantId,
+      [result.requestedByUserId],
+      'connection_accepted',
+      { connectionId, fromTenantId: auth.tenantId, href: '/workspace/company/connections' },
+      'connections',
+    );
+    return result.dto;
   }
 
   async decline(auth: AuthState, connectionId: string) {
@@ -751,7 +777,7 @@ export class CompanyNetworkService {
       throw new ForbiddenException('Messaging is disabled for this company');
     }
 
-    return this.prisma.withTenant(auth.tenantId, async (tx) => {
+    const sent = await this.prisma.withTenant(auth.tenantId, async (tx) => {
       const conversation = await this.requireAcceptedConversation(tx, auth.tenantId, prepared.conversationId);
       const message = await tx.companyMessage.create({
         data: {
@@ -786,6 +812,19 @@ export class CompanyNetworkService {
         mine: true,
       };
     });
+    await this.social.notifyUsers(
+      prepared.peerId,
+      'all-staff',
+      'new_message',
+      {
+        conversationId: sent.conversationId,
+        fromTenantId: auth.tenantId,
+        preview: text.slice(0, 120),
+        href: `/workspace/company/messages?peer=${auth.tenantId}`,
+      },
+      'messages',
+    );
+    return sent;
   }
 
   async markRead(auth: AuthState, conversationId: string) {

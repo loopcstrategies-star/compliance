@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -17,11 +19,15 @@ import { RequirePermissions } from '../auth/auth.decorator';
 import type { AuthedRequest } from '../auth/auth.guard';
 import { requireFile, UploadExceptionFilter, uploadOptions } from '../files/upload.filter';
 import { CompanyNetworkService } from './company-network.service';
+import { CompanyNetworkSocialService } from './company-network-social.service';
 
 @Controller('company-network')
 @UseFilters(UploadExceptionFilter)
 export class CompanyNetworkController {
-  constructor(private readonly network: CompanyNetworkService) {}
+  constructor(
+    private readonly network: CompanyNetworkService,
+    private readonly social: CompanyNetworkSocialService,
+  ) {}
 
   @Get('home')
   @RequirePermissions('company_network.read')
@@ -61,6 +67,85 @@ export class CompanyNetworkController {
     return this.network.uploadAsset(req.auth!, body?.assetType ?? '', requireFile(file).buffer);
   }
 
+  @Get('members/me')
+  @RequirePermissions('company_network.read')
+  myMember(@Req() req: AuthedRequest) {
+    return this.social.getMyMemberProfile(req.auth!);
+  }
+
+  @Put('members/me')
+  @RequirePermissions('company_network.write')
+  updateMyMember(@Req() req: AuthedRequest, @Body() body: Record<string, unknown>) {
+    return this.social.updateMyMemberProfile(req.auth!, body ?? {});
+  }
+
+  @Post('members/me/photo')
+  @RequirePermissions('company_network.write')
+  @UseInterceptors(FileInterceptor('file', uploadOptions))
+  uploadMemberPhoto(@Req() req: AuthedRequest, @UploadedFile() file: Express.Multer.File | undefined) {
+    return this.social.uploadMemberPhoto(req.auth!, requireFile(file).buffer);
+  }
+
+  @Get('members')
+  @RequirePermissions('company_network.read')
+  members(@Req() req: AuthedRequest) {
+    return this.social.listOwnMembers(req.auth!);
+  }
+
+  @Get('feed')
+  @RequirePermissions('company_network.read')
+  feed(@Req() req: AuthedRequest, @Query() query: { page?: string; pageSize?: string; tenantId?: string }) {
+    return this.social.listFeed(req.auth!, query ?? {});
+  }
+
+  @Post('posts')
+  @RequirePermissions('company_network.write')
+  createPost(@Req() req: AuthedRequest, @Body() body: { body?: string; postType?: string }) {
+    return this.social.createPost(req.auth!, body ?? {});
+  }
+
+  @Patch('posts/:id')
+  @RequirePermissions('company_network.write')
+  updatePost(@Req() req: AuthedRequest, @Param('id') id: string, @Body() body: { body?: string; postType?: string }) {
+    return this.social.updatePost(req.auth!, id, body ?? {});
+  }
+
+  @Delete('posts/:id')
+  @RequirePermissions('company_network.write')
+  deletePost(@Req() req: AuthedRequest, @Param('id') id: string) {
+    return this.social.deletePost(req.auth!, id);
+  }
+
+  @Post('posts/:id/comments')
+  @RequirePermissions('company_network.write')
+  comment(@Req() req: AuthedRequest, @Param('id') id: string, @Body() body: { body?: string }) {
+    return this.social.addComment(req.auth!, id, body ?? {});
+  }
+
+  @Post('posts/:id/reactions')
+  @RequirePermissions('company_network.write')
+  react(@Req() req: AuthedRequest, @Param('id') id: string, @Body() body: { reactionType?: string }) {
+    return this.social.toggleReaction(req.auth!, id, body ?? {});
+  }
+
+  @Get('notifications')
+  @RequirePermissions('company_network.read')
+  notifications(@Req() req: AuthedRequest, @Query() query: { page?: string; pageSize?: string }) {
+    return this.social.listNotifications(req.auth!, query ?? {});
+  }
+
+  @Get('notifications/unread-count')
+  @RequirePermissions('company_network.read')
+  notificationUnread(@Req() req: AuthedRequest) {
+    return this.social.unreadNotificationCount(req.auth!);
+  }
+
+  @Post('notifications/read')
+  @RequirePermissions('company_network.write')
+  markNotificationsRead(@Req() req: AuthedRequest, @Body() body: { ids?: string[]; all?: boolean }) {
+    return this.social.markNotificationsRead(req.auth!, body ?? {});
+  }
+
   @Get('discover')
   @RequirePermissions('company_network.read')
   discover(
@@ -68,6 +153,12 @@ export class CompanyNetworkController {
     @Query() query: { q?: string; country?: string; city?: string; industry?: string; page?: string; pageSize?: string },
   ) {
     return this.network.discover(req.auth!, query ?? {});
+  }
+
+  @Get('companies/:tenantId/members')
+  @RequirePermissions('company_network.read')
+  companyMembers(@Req() req: AuthedRequest, @Param('tenantId') tenantId: string) {
+    return this.social.listCompanyMembers(req.auth!, tenantId);
   }
 
   @Get('companies/:tenantId')

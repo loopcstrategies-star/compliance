@@ -3,6 +3,7 @@ import { apiGet } from '../../../../../lib/api';
 import { requireArea } from '../../../../../lib/session';
 import { CompanyShell } from '../../company-shell';
 import { ConnectionActions } from '../../connection-actions';
+import { FeedClient } from '../../feed-client';
 import type { NetworkProfile } from '../../network-types';
 
 export default async function PeerCompanyPage({ params }: { params: Promise<{ tenantId: string }> }) {
@@ -106,6 +107,7 @@ export default async function PeerCompanyPage({ params }: { params: Promise<{ te
                 'No public contact details.'}
             </p>
           </div>
+          <FeedClient tenantId={profile.tenantId} />
         </section>
       )}
     </CompanyShell>

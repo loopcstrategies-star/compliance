@@ -45,6 +45,11 @@ model Tenant {
   networkProfile CompanyNetworkProfile?
   connectionsRequested CompanyConnection[] @relation("ConnectionRequester")
   connectionsReceived CompanyConnection[] @relation("ConnectionAddressee")
+  memberNetworkProfiles MemberNetworkProfile[]
+  companyPosts CompanyPost[]
+  companyPostComments CompanyPostComment[] @relation("CommentAuthorTenant")
+  companyPostReactions CompanyPostReaction[] @relation("ReactionActorTenant")
+  companyNotifications CompanyNotification[]
 
   @@map("tenants")
 }
@@ -64,6 +69,11 @@ model User {
   customer     Customer?
   reviewDecisions ReviewDecision[]
   assignedApplications Application[] @relation("ApplicationAssignee")
+  memberNetworkProfiles MemberNetworkProfile[]
+  companyPosts CompanyPost[]
+  companyPostComments CompanyPostComment[]
+  companyPostReactions CompanyPostReaction[]
+  companyNotifications CompanyNotification[]
 
   @@index([tenantId])
   @@map("users")
@@ -374,6 +384,7 @@ model StoredFile {
   packages     GeneratedPackage[]
   companyEvidence CompanyEvidence[]
   companyAssets TenantCompanyAsset[]
+  memberNetworkPhotos MemberNetworkProfile[]
 
   @@index([tenantId])
   @@map("stored_files")
@@ -686,4 +697,93 @@ model CompanyMessage {
   @@index([conversationId, createdAt])
   @@index([senderTenantId, readAt])
   @@map("company_messages")
+}
+
+model MemberNetworkProfile {
+  id                String      @id @default(uuid()) @db.Uuid
+  tenantId          String      @map("tenant_id") @db.Uuid
+  userId            String      @map("user_id") @db.Uuid
+  jobTitle          String      @default("") @map("job_title")
+  department        String      @default("")
+  introduction      String      @default("")
+  photoFileId       String?     @map("photo_file_id") @db.Uuid
+  notifyMessages    Boolean     @default(true) @map("notify_messages")
+  notifyConnections Boolean     @default(true) @map("notify_connections")
+  notifyFeed        Boolean     @default(true) @map("notify_feed")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  tenant            Tenant      @relation(fields: [tenantId], references: [id])
+  user              User        @relation(fields: [userId], references: [id])
+  photoFile         StoredFile? @relation(fields: [photoFileId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("member_network_profiles")
+}
+
+model CompanyPost {
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @map("tenant_id") @db.Uuid
+  authorUserId String               @map("author_user_id") @db.Uuid
+  body         String
+  postType     String               @default("announcement") @map("post_type")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  deletedAt    DateTime?            @map("deleted_at")
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  author       User                 @relation(fields: [authorUserId], references: [id])
+  comments     CompanyPostComment[]
+  reactions    CompanyPostReaction[]
+
+  @@index([tenantId, createdAt])
+  @@index([deletedAt])
+  @@map("company_posts")
+}
+
+model CompanyPostComment {
+  id             String      @id @default(uuid()) @db.Uuid
+  postId         String      @map("post_id") @db.Uuid
+  authorTenantId String      @map("author_tenant_id") @db.Uuid
+  authorUserId   String      @map("author_user_id") @db.Uuid
+  body           String
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  post           CompanyPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorTenant   Tenant      @relation("CommentAuthorTenant", fields: [authorTenantId], references: [id])
+  author         User        @relation(fields: [authorUserId], references: [id])
+
+  @@index([postId, createdAt])
+  @@map("company_post_comments")
+}
+
+model CompanyPostReaction {
+  id            String      @id @default(uuid()) @db.Uuid
+  postId        String      @map("post_id") @db.Uuid
+  actorTenantId String      @map("actor_tenant_id") @db.Uuid
+  actorUserId   String      @map("actor_user_id") @db.Uuid
+  reactionType  String      @default("like") @map("reaction_type")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  post          CompanyPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  actorTenant   Tenant      @relation("ReactionActorTenant", fields: [actorTenantId], references: [id])
+  actor         User        @relation(fields: [actorUserId], references: [id])
+
+  @@unique([postId, actorTenantId, actorUserId])
+  @@index([postId])
+  @@map("company_post_reactions")
+}
+
+model CompanyNotification {
+  id                String    @id @default(uuid()) @db.Uuid
+  recipientTenantId String    @map("recipient_tenant_id") @db.Uuid
+  recipientUserId   String    @map("recipient_user_id") @db.Uuid
+  type              String
+  payload           Json      @default("{}")
+  readAt            DateTime? @map("read_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  recipientTenant   Tenant    @relation(fields: [recipientTenantId], references: [id])
+  recipientUser     User      @relation(fields: [recipientUserId], references: [id])
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientTenantId, createdAt])
+  @@map("company_notifications")
 }

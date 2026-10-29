@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ConnectionActions } from './connection-actions';
+import { FeedClient, type FeedPost } from './feed-client';
 import type { ConnectionRow, ConversationRow, NetworkProfile } from './network-types';
 
 export type NetworkHomeData = {
@@ -13,6 +14,7 @@ export type NetworkHomeData = {
   recentConversations: ConversationRow[];
   unreadCount: number;
   connectionCount: number;
+  activity?: FeedPost[];
 };
 
 export function NetworkHome({ data }: { data: NetworkHomeData }) {
@@ -112,6 +114,8 @@ export function NetworkHome({ data }: { data: NetworkHomeData }) {
           <span>Find partners by industry, location, and services.</span>
         </Link>
       </section>
+
+      <FeedClient initialItems={data.activity ?? []} />
 
       <div className="network-home-columns">
         <section className="panel">
