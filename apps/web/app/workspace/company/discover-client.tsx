@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ConnectionActions } from './connection-actions';
+import { NetworkUnavailable } from './network-unavailable';
 import type { NetworkProfile } from './network-types';
 
 type DiscoverResponse = {
@@ -97,12 +98,10 @@ export function DiscoverClient() {
       </form>
       {loading ? <p className="notice">Loading companies…</p> : null}
       {error ? (
-        <p className="notice error">
-          {error}{' '}
-          <button type="button" className="button-secondary" onClick={() => void load(page)}>
-            Retry
-          </button>
-        </p>
+        <NetworkUnavailable
+          title="Company discovery is unavailable right now"
+          onRetry={() => void load(page)}
+        />
       ) : null}
       {!loading && data && data.items.length === 0 ? (
         <p className="notice">No discoverable companies match these filters.</p>
